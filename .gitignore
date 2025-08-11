@@ -176,3 +176,5 @@ cython_debug/
 /9) Masterskaya/data/*
 /9) Masterskaya/models/*
 9) Masterskaya/models/preprocessor.pkl
+/9) Masterskaya/mlruns/*
+mlruns/0/meta.yaml
