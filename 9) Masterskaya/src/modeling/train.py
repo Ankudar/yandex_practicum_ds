@@ -50,7 +50,7 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
 
 TEST_SIZE = 0.25
 RANDOM_STATE = 40
-N_TRIALS = 2
+N_TRIALS = 100
 N_SPLITS = 5
 METRIC = "precision"
 TARGET_COL = "heart_attack_risk_(binary)"
@@ -87,7 +87,7 @@ def is_new_model_better(new_metrics, old_metrics, delta=0.001):
 
 def manual_optuna_progress(study, n_trials, func):
     for _ in tqdm(range(n_trials), desc="Optuna Tuning"):
-        study.optimize(func, n_trials=1, catch=(Exception,), n_jobs=N_JOBS)
+        study.optimize(func, n_trials=1, catch=(Exception,))
 
 
 def objective(trial, X_train, y_train, all_columns):
@@ -138,7 +138,7 @@ def objective(trial, X_train, y_train, all_columns):
             "eval_metric": "logloss",
             "tree_method": "hist",
             "random_state": RANDOM_STATE,
-            "n_jobs": -1,
+            "n_jobs": 1,
         }
 
         skf = StratifiedKFold(
@@ -289,8 +289,8 @@ def run_optuna_experiment(
         n_selected_features = study.best_trial.user_attrs["n_selected_features"]
         best_params.pop("k_best", None)  # убираем параметр, если есть
 
-        X_train = X_train[selected_features]
-        X_test = X_test[selected_features]
+        X_train = X_train[selected_features].astype(float)  # Преобразуем в float
+        X_test = X_test[selected_features].astype(float)  # Преобразуем в float
 
         # Извлекаем лучший порог
         best_threshold = study.best_trial.user_attrs["best_threshold"]
@@ -302,6 +302,8 @@ def run_optuna_experiment(
             n_jobs=N_JOBS,
             eval_metric="logloss",
         )
+
+        logger.info(f"Гиперпараметры подобраны, начинается финальное обучение модели")
         final_model.fit(X_train, y_train)
 
         # Предсказания
@@ -321,6 +323,15 @@ def run_optuna_experiment(
             "roc_auc": roc_auc_score(y_test, y_pred_proba),
             "f1": f1_score(y_test, y_pred),
         }
+
+        logger.info(
+            f"Модель обучена с параметрами: "
+            f"accuracy={final_metrics['accuracy']:.4f}, "
+            f"precision={final_metrics['precision']:.4f}, "
+            f"recall={final_metrics['recall']:.4f}, "
+            f"roc_auc={final_metrics['roc_auc']:.4f}, "
+            f"f1={final_metrics['f1']:.4f}"
+        )
 
         # Проверка — стоит ли сохранять модель
         save_model = True
@@ -371,7 +382,8 @@ def run_optuna_experiment(
 
         # Метрики на трейне
         input_example = pd.DataFrame(X_test[:1], columns=X_test.columns)
-        input_example = input_example.astype("float64")
+        input_example = input_example.astype(np.float64)
+
         y_pred_proba_train = final_model.predict_proba(X_train)[:, 1]
         y_pred_train = (y_pred_proba_train >= best_threshold).astype(int)
 
@@ -391,21 +403,8 @@ def run_optuna_experiment(
         # Логирование в MLflow
         log_with_mlflow(
             final_model=final_model,
-            metric=metric,
-            best_params=best_params,
-            best_threshold=best_threshold,
-            study=study,
-            X_test=X_test,
-            y_test=y_test,
-            final_metrics=final_metrics,
-            final_metrics_train=final_metrics_train,
-            selected_features=selected_features,
             model_output_path=model_output_path,
             run_name=f"model_{current_time}",
-            n_trials=n_trials,
-            input_example=input_example,
-            y_pred_proba=y_pred_proba,
-            y_pred=y_pred,
         )
 
     except Exception as e:
@@ -415,50 +414,21 @@ def run_optuna_experiment(
 
 def log_with_mlflow(
     final_model,
-    metric,
-    best_params,
-    best_threshold,
-    study,
-    X_test,
-    y_test,
-    final_metrics,
-    final_metrics_train,
-    selected_features,
     model_output_path,
     run_name,
-    n_trials,
-    input_example,
-    y_pred_proba,
-    y_pred,
 ):
     try:
         if mlflow.active_run():
             mlflow.end_run()
 
         with mlflow.start_run(run_name=run_name):
-            # Лог параметров
-            mlflow.log_params(best_params)
-            mlflow.log_param("threshold", round(best_threshold, 4))
-            mlflow.log_param("n_trials", n_trials)
-            mlflow.log_param("model_type", "XGBClassifier")
-            mlflow.log_param("n_selected_features", len(selected_features))
-
-            # Лог метрик
-            for key in ["accuracy", "precision", "recall", "f1", "roc_auc"]:
-                mlflow.log_metric(f"{key}_train", round(final_metrics_train[key], 4))
-                mlflow.log_metric(f"{key}_test", round(final_metrics[key], 4))
-
-            # Создаем input_example из X_test (первой строки), явно задаем колонки
-            input_example = pd.DataFrame(X_test[:1], columns=X_test.columns)
-
-            mlflow.sklearn.log_model(  # type: ignore
-                final_model,
-                name="model",
-                input_example=input_example,
-            )
-
-            # Логируем сохраненный файл модели
-            mlflow.log_artifact(model_output_path)
+            # Логируем модель как артефакт (файл .pkl с названием run_name)
+            artifact_name = f"{run_name}.pkl"
+            # Сохраняем модель во временный файл с нужным именем
+            tmp_path = artifact_name
+            joblib.dump(final_model, tmp_path)
+            mlflow.log_artifact(tmp_path)
+            os.remove(tmp_path)
 
     except Exception as e:
         logger.error(f"Ошибка в упрощенном log_with_mlflow: {e}")
@@ -482,8 +452,6 @@ if __name__ == "__main__":
             TRAIN_DATA[col] = pd.to_numeric(TRAIN_DATA[col])
         except ValueError:
             pass
-
-    TRAIN_DATA.set_index("id", inplace=True)
 
     # Найти integer столбцы с пропусками и привести их к float64
     int_cols_with_na = [
@@ -520,7 +488,7 @@ if __name__ == "__main__":
             f"FP_PENALTY_WEIGHT={FP_PENALTY_WEIGHT}, FN_STOP={FN_STOP}, MAX_FN_SOFT={MAX_FN_SOFT} ==="
         )
 
-        X_train_data, X_test_data, y_train_data, y_test_data = train_test_split(
+        X_train, X_test, y_train, y_test = train_test_split(
             X_main,
             y_main,
             test_size=TEST_SIZE,
@@ -529,10 +497,10 @@ if __name__ == "__main__":
         )
 
         run_optuna_experiment(
-            X_train=X_train_data,
-            y_train=y_train_data,
-            X_test=X_test_data,
-            y_test=y_test_data,
+            X_train=X_train,
+            y_train=y_train,
+            X_test=X_test,
+            y_test=y_test,
             metric=METRIC,
             n_trials=N_TRIALS,
             experiment_name=f"{MLFLOW_EXPERIMENT}",
