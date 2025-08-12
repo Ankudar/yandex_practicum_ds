@@ -182,7 +182,7 @@ def objective(trial, X_train, y_train, all_columns):
                 if METRIC == "f1":
                     score_t = f1_score(y_val, y_pred_t, zero_division=0)
                 elif METRIC == "f2":
-                    score_t = fbeta_score(y_val, y_pred_t, beta=1.5, zero_division=0)
+                    score_t = fbeta_score(y_val, y_pred_t, beta=1.2, zero_division=0)
                 elif METRIC == "bal_acc":
                     score_t = balanced_accuracy_score(y_val, y_pred_t)
                 elif METRIC == "accuracy":
@@ -769,8 +769,10 @@ if __name__ == "__main__":
     y_main = TRAIN_DATA[TARGET_COL]
 
     # Сетка параметров
-    fn_penalty_grid = range(1, 3)
-    fp_penalty_grid = range(1, 3)
+    # fn_penalty_grid = range(1, 3)
+    # fp_penalty_grid = range(1, 3)
+    fn_penalty_grid = np.arange(0.1, 2, 0.5)
+    fp_penalty_grid = np.arange(0.1, 2, 0.5)
     fn_stop_grid = range(0, 3)
     max_fn_soft_grid = range(0, 3)
 
