@@ -18,6 +18,7 @@ from sklearn.metrics import (
     ConfusionMatrixDisplay,
     RocCurveDisplay,
     accuracy_score,
+    balanced_accuracy_score,
     confusion_matrix,
     f1_score,
     fbeta_score,
@@ -50,7 +51,7 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
 
 TEST_SIZE = 0.25
 RANDOM_STATE = 40
-N_TRIALS = 100
+N_TRIALS = 200
 N_SPLITS = 5
 METRIC = "f2"
 TARGET_COL = "heart_attack_risk_(binary)"
@@ -113,7 +114,7 @@ def objective(trial, X_train, y_train, all_columns):
         Лучшее значение метрики в соответствии с выбранным критерием.
     """
     try:
-        k_best = trial.suggest_int("k_best", 5, min(40, X_train.shape[1]))
+        k_best = trial.suggest_int("k_best", 7, min(40, X_train.shape[1]))
         selector = SelectKBest(score_func=f_classif, k=k_best)
         X_train_sel = selector.fit_transform(X_train, y_train)
         selected_idx = selector.get_support(indices=True)
@@ -141,7 +142,15 @@ def objective(trial, X_train, y_train, all_columns):
         skf = StratifiedKFold(
             n_splits=N_SPLITS, shuffle=True, random_state=RANDOM_STATE
         )
-        recalls, precisions, f1s, f2s, accuracies, roc_auc = [], [], [], [], [], []
+        recalls, precisions, f1s, f2s, accuracies, roc_auc, bal_acc = (
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+        )
         fn_list, fp_list, tn_list, tp_list = [], [], [], []
         fold_thresholds = []
 
@@ -174,6 +183,8 @@ def objective(trial, X_train, y_train, all_columns):
                     score_t = f1_score(y_val, y_pred_t, zero_division=0)
                 elif METRIC == "f2":
                     score_t = fbeta_score(y_val, y_pred_t, beta=1.5, zero_division=0)
+                elif METRIC == "bal_acc":
+                    score_t = balanced_accuracy_score(y_val, y_pred_t)
                 elif METRIC == "accuracy":
                     score_t = accuracy_score(y_val, y_pred_t)
                 elif METRIC == "recall":
@@ -203,6 +214,7 @@ def objective(trial, X_train, y_train, all_columns):
             precisions.append(precision_score(y_val, y_pred, zero_division=0))
             f1s.append(f1_score(y_val, y_pred, zero_division=0))
             f2s.append(fbeta_score(y_val, y_pred, beta=2, zero_division=0))
+            bal_acc.append(balanced_accuracy_score(y_val, y_pred_t))
             accuracies.append(accuracy_score(y_val, y_pred))
             roc_auc.append(roc_auc_score(y_val, y_proba))
 
@@ -220,11 +232,14 @@ def objective(trial, X_train, y_train, all_columns):
         mean_f2 = np.mean(f2s)
         mean_accuracy = np.mean(accuracies)
         mean_roc_auc = np.mean(roc_auc)
+        mean_bal_acc = np.mean(bal_acc)
 
         if METRIC == "f1":
             score = mean_f1
         elif METRIC == "f2":
             score = mean_f2
+        elif METRIC == "bal_acc":
+            score = mean_bal_acc
         elif METRIC == "accuracy":
             score = mean_accuracy
         elif METRIC == "recall":
@@ -241,8 +256,8 @@ def objective(trial, X_train, y_train, all_columns):
 
         logger.info(
             f"\nTrial {trial.number} → k_best: {k_best}\n"
-            f"Recall: {mean_recall:.3f}, Precision: {mean_precision:.3f}, F1: {mean_f1:.3f},\n"
-            f"Accuracy: {mean_accuracy:.3f}, Score: {score:.3f}\n"
+            f"Recall: {mean_recall:.3f}, Precision: {mean_precision:.3f},\n"
+            f"Accuracy: {mean_accuracy:.3f}, {METRIC}_Score: {score:.3f}\n"
             f"FN: {np.mean(fn_list):.1f}, FP: {np.mean(fp_list):.1f}, TN: {np.mean(tn_list):.1f}, TP: {np.mean(tp_list):.1f}\n"
         )
 
@@ -299,6 +314,7 @@ def run_optuna_experiment(
             random_state=RANDOM_STATE,
             n_jobs=N_JOBS,
             eval_metric="logloss",
+            tree_method="hist",
         )
 
         logger.info(f"Гиперпараметры подобраны, начинается финальное обучение модели")
@@ -321,6 +337,7 @@ def run_optuna_experiment(
             "roc_auc": roc_auc_score(y_test, y_pred_proba),
             "f1": f1_score(y_test, y_pred),
             "f2": fbeta_score(y_test, y_pred, beta=2, zero_division=0),
+            "bal_acc": balanced_accuracy_score(y_test, y_pred),
         }
 
         logger.info(
@@ -331,6 +348,7 @@ def run_optuna_experiment(
             f"roc_auc={final_metrics['roc_auc']:.4f}, "
             f"f1={final_metrics['f1']:.4f}, "
             f"f2={final_metrics['f2']:.4f}, "
+            f"bal_acc={final_metrics['bal_acc']:.4f}, "
         )
 
         # Проверка — стоит ли сохранять модель
@@ -399,6 +417,7 @@ def run_optuna_experiment(
             "roc_auc": roc_auc_score(y_train, y_pred_proba_train),
             "f1": f1_score(y_train, y_pred_train),
             "f2": fbeta_score(y_train, y_pred_train, beta=2, zero_division=0),
+            "bal_acc": balanced_accuracy_score(y_train, y_pred_train),
         }
 
         # Логирование в MLflow
@@ -474,6 +493,9 @@ def log_with_mlflow(
 
             mlflow.log_metric("f2_train", round(final_metrics_train["f2"], 3))
             mlflow.log_metric("f2_test", round(final_metrics["f2"], 3))
+
+            mlflow.log_metric("bal_acc_train", round(final_metrics_train["bal_acc"], 3))
+            mlflow.log_metric("bal_acc_test", round(final_metrics["bal_acc"], 3))
 
             mlflow.log_metric(
                 "accuracy_train", round(final_metrics_train["accuracy"], 3)
