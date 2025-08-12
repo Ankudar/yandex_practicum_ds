@@ -6,7 +6,7 @@ import logging
 import os
 
 import pandas as pd
-from datapreprocessor import DataPreProcessor  # твой класс
+from datapreprocessor import DataPreProcessor
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
