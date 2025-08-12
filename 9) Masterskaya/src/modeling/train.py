@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import warnings
 from datetime import datetime
 from itertools import product
 
@@ -21,6 +20,7 @@ from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
     f1_score,
+    fbeta_score,
     precision_recall_fscore_support,
     precision_score,
     recall_score,
@@ -52,22 +52,19 @@ TEST_SIZE = 0.25
 RANDOM_STATE = 40
 N_TRIALS = 100
 N_SPLITS = 5
-METRIC = "precision"
+METRIC = "f2"
 TARGET_COL = "heart_attack_risk_(binary)"
 N_JOBS = -1
 THRESHOLDS = np.arange(0.1, 0.9, 0.01)
-MIN_PRECISION = (
-    0.6  # гугл говорит, что меньше 0.9 табу для медицины, но пока попробуем так
-)
+MIN_PRECISION = 0.9  # гугл говорит, что меньше 0.9 табу для медицины
 MLFLOW_EXPERIMENT = "heat_pred"
 
 
 def get_confusion_counts(cm):
     if cm.shape == (2, 2):
-        tn, fp, fn, tp = cm.ravel()
+        return cm.ravel()
     else:
-        tn, fp, fn, tp = get_confusion_counts(cm)
-    return tn, fp, fn, tp
+        raise ValueError(f"Ожидалась матрица размером 2x2, получена {cm.shape}")
 
 
 def is_new_model_better(new_metrics, old_metrics, delta=0.001):
@@ -144,7 +141,7 @@ def objective(trial, X_train, y_train, all_columns):
         skf = StratifiedKFold(
             n_splits=N_SPLITS, shuffle=True, random_state=RANDOM_STATE
         )
-        recalls, precisions, f1s, accuracies, roc_auc = [], [], [], [], []
+        recalls, precisions, f1s, f2s, accuracies, roc_auc = [], [], [], [], [], []
         fn_list, fp_list, tn_list, tp_list = [], [], [], []
         fold_thresholds = []
 
@@ -175,6 +172,8 @@ def objective(trial, X_train, y_train, all_columns):
 
                 if METRIC == "f1":
                     score_t = f1_score(y_val, y_pred_t, zero_division=0)
+                elif METRIC == "f2":
+                    score_t = fbeta_score(y_val, y_pred_t, beta=1.5, zero_division=0)
                 elif METRIC == "accuracy":
                     score_t = accuracy_score(y_val, y_pred_t)
                 elif METRIC == "recall":
@@ -192,13 +191,8 @@ def objective(trial, X_train, y_train, all_columns):
                 if score_t is None:
                     continue
 
-                if fn <= best_fn + MAX_FN_SOFT and (
-                    fn < best_fn
-                    or (fn == best_fn and fp < best_fp)
-                    or (fn == best_fn and fp == best_fp and score_t > best_score)
-                ):
+                if fp < best_fp or (fp == best_fp and score_t > best_score):
                     best_fp = fp
-                    best_fn = fn
                     best_score = score_t
                     best_threshold = t
 
@@ -208,6 +202,7 @@ def objective(trial, X_train, y_train, all_columns):
             recalls.append(recall_score(y_val, y_pred))
             precisions.append(precision_score(y_val, y_pred, zero_division=0))
             f1s.append(f1_score(y_val, y_pred, zero_division=0))
+            f2s.append(fbeta_score(y_val, y_pred, beta=2, zero_division=0))
             accuracies.append(accuracy_score(y_val, y_pred))
             roc_auc.append(roc_auc_score(y_val, y_proba))
 
@@ -222,11 +217,14 @@ def objective(trial, X_train, y_train, all_columns):
         mean_recall = np.mean(recalls)
         mean_precision = np.mean(precisions)
         mean_f1 = np.mean(f1s)
+        mean_f2 = np.mean(f2s)
         mean_accuracy = np.mean(accuracies)
         mean_roc_auc = np.mean(roc_auc)
 
         if METRIC == "f1":
             score = mean_f1
+        elif METRIC == "f2":
+            score = mean_f2
         elif METRIC == "accuracy":
             score = mean_accuracy
         elif METRIC == "recall":
@@ -287,10 +285,10 @@ def run_optuna_experiment(
         # Извлекаем признаки
         selected_features = study.best_trial.user_attrs["selected_features"]
         n_selected_features = study.best_trial.user_attrs["n_selected_features"]
-        best_params.pop("k_best", None)  # убираем параметр, если есть
+        best_params.pop("k_best", None)
 
-        X_train = X_train[selected_features].astype(float)  # Преобразуем в float
-        X_test = X_test[selected_features].astype(float)  # Преобразуем в float
+        X_train = X_train[selected_features].astype(float)
+        X_test = X_test[selected_features].astype(float)
 
         # Извлекаем лучший порог
         best_threshold = study.best_trial.user_attrs["best_threshold"]
@@ -322,6 +320,7 @@ def run_optuna_experiment(
             "recall": recall,
             "roc_auc": roc_auc_score(y_test, y_pred_proba),
             "f1": f1_score(y_test, y_pred),
+            "f2": fbeta_score(y_test, y_pred, beta=2, zero_division=0),
         }
 
         logger.info(
@@ -330,7 +329,8 @@ def run_optuna_experiment(
             f"precision={final_metrics['precision']:.4f}, "
             f"recall={final_metrics['recall']:.4f}, "
             f"roc_auc={final_metrics['roc_auc']:.4f}, "
-            f"f1={final_metrics['f1']:.4f}"
+            f"f1={final_metrics['f1']:.4f}, "
+            f"f2={final_metrics['f2']:.4f}, "
         )
 
         # Проверка — стоит ли сохранять модель
@@ -398,13 +398,27 @@ def run_optuna_experiment(
             "recall": recall_train,
             "roc_auc": roc_auc_score(y_train, y_pred_proba_train),
             "f1": f1_score(y_train, y_pred_train),
+            "f2": fbeta_score(y_train, y_pred_train, beta=2, zero_division=0),
         }
 
         # Логирование в MLflow
         log_with_mlflow(
             final_model=final_model,
+            metric=metric,
+            best_params=best_params,
+            best_threshold=best_threshold,
+            study=study,
+            X_test=X_test,
+            y_test=y_test,
+            final_metrics=final_metrics,
+            final_metrics_train=final_metrics_train,
+            selected_features=selected_features,
             model_output_path=model_output_path,
             run_name=f"model_{current_time}",
+            n_trials=n_trials,
+            input_example=input_example,
+            y_pred_proba=y_pred_proba,
+            y_pred=y_pred,
         )
 
     except Exception as e:
@@ -414,24 +428,287 @@ def run_optuna_experiment(
 
 def log_with_mlflow(
     final_model,
+    metric,
+    best_params,
+    best_threshold,
+    study,
+    X_test,
+    y_test,
+    final_metrics,
+    final_metrics_train,
+    selected_features,
     model_output_path,
     run_name,
+    n_trials,
+    input_example,
+    y_pred_proba,
+    y_pred,
 ):
     try:
+        n_selected_features = len(selected_features)
+        cm_test = confusion_matrix(y_test, y_pred, labels=[0, 1])
+        tn, fp, fn, tp = get_confusion_counts(cm_test)
+
         if mlflow.active_run():
             mlflow.end_run()
 
         with mlflow.start_run(run_name=run_name):
-            # Логируем модель как артефакт (файл .pkl с названием run_name)
-            artifact_name = f"{run_name}.pkl"
-            # Сохраняем модель во временный файл с нужным именем
-            tmp_path = artifact_name
-            joblib.dump(final_model, tmp_path)
-            mlflow.log_artifact(tmp_path)
-            os.remove(tmp_path)
+            mlflow.log_params(best_params)
+            mlflow.log_param("test_size", TEST_SIZE)
+            mlflow.log_param("random_state", RANDOM_STATE)
+            mlflow.log_param("n_trials", n_trials)
+            mlflow.log_param("n_splits", N_SPLITS)
+            mlflow.log_param("model_type", "XGBClassifier")
+            mlflow.log_param("threshold", round(best_threshold, 4))
+            mlflow.log_param(
+                "cv_best_threshold",
+                round(study.best_trial.user_attrs["best_threshold"], 4),
+            )
+
+            mlflow.log_param("opt_metric", f"{metric}")
+            mlflow.log_metric("fn_test", fn)
+            mlflow.log_metric("fp_test", fp)
+
+            mlflow.log_metric("f1_train", round(final_metrics_train["f1"], 3))
+            mlflow.log_metric("f1_test", round(final_metrics["f1"], 3))
+
+            mlflow.log_metric("f2_train", round(final_metrics_train["f2"], 3))
+            mlflow.log_metric("f2_test", round(final_metrics["f2"], 3))
+
+            mlflow.log_metric(
+                "accuracy_train", round(final_metrics_train["accuracy"], 3)
+            )
+            mlflow.log_metric("accuracy_test", round(final_metrics["accuracy"], 3))
+
+            mlflow.log_metric("recall_train", round(final_metrics_train["recall"], 3))
+            mlflow.log_metric("recall_test", round(final_metrics["recall"], 3))
+
+            mlflow.log_metric(
+                "precision_train", round(final_metrics_train["precision"], 3)
+            )
+            mlflow.log_metric("precision_test", round(final_metrics["precision"], 3))
+
+            mlflow.log_metric("roc_auc_train", round(final_metrics_train["roc_auc"], 3))
+            mlflow.log_metric("roc_auc_test", round(final_metrics["roc_auc"], 3))
+
+            mlflow.log_artifact(model_output_path)
+            mlflow.sklearn.log_model(final_model, name="final_model", input_example=input_example)  # type: ignore
+
+            # Confusion matrix
+            fig_cm, ax_cm = plt.subplots()
+            ConfusionMatrixDisplay.from_predictions(y_test, y_pred, ax=ax_cm)
+            fig_cm.tight_layout()
+            fig_cm.savefig("confusion_matrix.png")
+            plt.close(fig_cm)
+            mlflow.log_artifact("confusion_matrix.png")
+            os.remove("confusion_matrix.png")
+
+            # ROC curve
+            fig_roc, ax_roc = plt.subplots()
+            RocCurveDisplay.from_predictions(y_test, y_pred_proba, ax=ax_roc)
+            fig_roc.tight_layout()
+            fig_roc.savefig("roc_curve.png")
+            plt.close(fig_roc)
+            mlflow.log_artifact("roc_curve.png")
+            os.remove("roc_curve.png")
+
+            # SHAP
+            if hasattr(final_model, "feature_names_in_"):
+                X_test = X_test[final_model.feature_names_in_]
+
+            explainer = shap.Explainer(final_model, X_test)
+            shap_values = explainer(X_test, check_additivity=False)
+
+            shap_class_1 = shap_values
+
+            # Строим dot plot
+            plt.figure()
+            shap.summary_plot(
+                shap_class_1, X_test, plot_type="dot", show=False, max_display=39
+            )
+            plt.tight_layout()
+            plt.savefig("shap_dot_plot.png")
+            plt.close()
+
+            # Логгируем артефакт в MLflow
+            mlflow.log_artifact("shap_dot_plot.png")
+            os.remove("shap_dot_plot.png")
+
+            # Threshold vs metrics
+            f1s, precisions, recalls = [], [], []
+            for t in THRESHOLDS:
+                y_pred_temp = (y_pred_proba >= t).astype(int)
+                p, r, f1, _ = precision_recall_fscore_support(
+                    y_test, y_pred_temp, average="binary", zero_division=0
+                )
+                f1s.append(f1)
+                precisions.append(p)
+                recalls.append(r)
+
+            plt.figure(figsize=(8, 6))
+            plt.plot(THRESHOLDS, f1s, label="F1")
+            plt.plot(THRESHOLDS, precisions, label="Precision")
+            plt.plot(THRESHOLDS, recalls, label="Recall")
+            plt.axvline(
+                float(best_threshold),
+                color="gray",
+                linestyle="--",
+                label=f"Threshold = {round(best_threshold, 3)}",
+            )
+            plt.xlabel("Threshold")
+            plt.ylabel("Score")
+            plt.title("Threshold vs F1 / Precision / Recall")
+            plt.legend()
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig("threshold_metrics.png")
+            plt.close()
+            mlflow.log_artifact("threshold_metrics.png")
+            os.remove("threshold_metrics.png")
+
+            # Гистограмма предсказанных вероятностей
+            plt.figure(figsize=(8, 6))
+            plt.hist(y_pred_proba, bins=50, alpha=0.7)
+            plt.axvline(
+                float(best_threshold),
+                color="red",
+                linestyle="--",
+                label=f"Threshold = {round(best_threshold, 3)}",
+            )
+            plt.title("Distribution of predicted probabilities")
+            plt.xlabel("Probability")
+            plt.ylabel("Count")
+            plt.legend()
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig("proba_distribution.png")
+            plt.close()
+            mlflow.log_artifact("proba_distribution.png")
+            os.remove("proba_distribution.png")
+
+            # TP/FP/FN/TN vs Threshold plot
+            tps, fps, fns, tns = [], [], [], []
+
+            for t in THRESHOLDS:
+                y_pred_temp = (y_pred_proba >= t).astype(int)
+                cm_temp = confusion_matrix(y_test, y_pred_temp, labels=[0, 1])
+                tn, fp, fn, tp = get_confusion_counts(cm_temp)
+                tps.append(tp)
+                fps.append(fp)
+                fns.append(fn)
+                tns.append(tn)
+
+            plt.figure(figsize=(8, 6))
+            plt.plot(THRESHOLDS, tps, label="TP")
+            plt.plot(THRESHOLDS, fps, label="FP")
+            plt.plot(THRESHOLDS, fns, label="FN")
+            plt.plot(THRESHOLDS, tns, label="TN")
+            plt.axvline(
+                float(best_threshold),
+                color="gray",
+                linestyle="--",
+                label=f"Threshold = {round(best_threshold, 3)}",
+            )
+            plt.xlabel("Threshold")
+            plt.ylabel("Count")
+            plt.title("TP / FP / FN / TN vs Threshold")
+            plt.legend()
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig("threshold_confusion_counts.png")
+            plt.close()
+            mlflow.log_artifact("threshold_confusion_counts.png")
+            os.remove("threshold_confusion_counts.png")
+
+            selected_features_path = "selected_features.txt"
+            with open(selected_features_path, "w") as f:
+                for feat in selected_features:
+                    f.write(f"{feat}\n")
+
+            mlflow.log_param("n_selected_features", n_selected_features)
+            mlflow.log_artifact(selected_features_path)
+            os.remove(selected_features_path)
+
+            # матрица кореляции
+            corr_matrix = X_test[selected_features].corr(method="pearson")
+            plt.figure(figsize=(12, 10))
+            sns.heatmap(
+                corr_matrix,
+                annot=True,
+                fmt=".2f",
+                cmap="coolwarm",
+                center=0,
+                square=True,
+                cbar_kws={"shrink": 0.75},
+                linewidths=0.5,
+                linecolor="gray",
+                annot_kws={"size": 6},
+            )
+            plt.title("Correlation Heatmap (Test Data)")
+            plt.tight_layout()
+            plt.savefig("correlation_heatmap.png")
+            plt.close()
+            mlflow.log_artifact("correlation_heatmap.png")
+            os.remove("correlation_heatmap.png")
+
+            # покажет высококорелирующиеся пары (|corr| > 0.9)
+            high_corr_output = "high_corr_pairs.txt"
+            corr_abs = corr_matrix.abs()
+            upper = corr_abs.where(np.triu(np.ones(corr_abs.shape), k=1).astype(bool))
+
+            with open(high_corr_output, "w") as f:
+                for col in upper.columns:
+                    for row in upper.index:
+                        val = upper.loc[row, col]
+                        if pd.notnull(val) and val > 0.9:
+                            f.write(f"{row} - {col}: {val:.3f}\n")
+
+            mlflow.log_artifact(high_corr_output)
+            os.remove(high_corr_output)
+
+            params_path = "best_params.json"
+            with open(params_path, "w") as f:
+                json.dump(best_params, f, indent=4)
+
+            mlflow.log_artifact(params_path)
+            os.remove(params_path)
+
+            experiment_config = {
+                "TEST_SIZE": TEST_SIZE,
+                "RANDOM_STATE": RANDOM_STATE,
+                "N_TRIALS": N_TRIALS,
+                "N_SPLITS": N_SPLITS,
+                "METRIC": METRIC,
+                "TARGET_COL": TARGET_COL,
+                "FN_PENALTY_WEIGHT": FN_PENALTY_WEIGHT,
+                "FP_PENALTY_WEIGHT": FP_PENALTY_WEIGHT,
+                "MIN_PRECISION": MIN_PRECISION,
+                "FN_STOP": FN_STOP,
+                "MAX_FN_SOFT": MAX_FN_SOFT,
+            }
+
+            with open("experiment_config.json", "w") as f:
+                json.dump(experiment_config, f, indent=4)
+            mlflow.log_artifact("experiment_config.json")
+            os.remove("experiment_config.json")
+
+            # Логирование прогресса оптимизации Optuna (оценка trial на каждой итерации)
+            scores = [trial.value for trial in study.trials if trial.value is not None]
+
+            plt.figure(figsize=(10, 6))
+            plt.plot(scores, marker="o", linestyle="-", alpha=0.8)
+            plt.xlabel("Trial Number")
+            plt.ylabel("Score")
+            plt.title("Optuna Optimization Progress")
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig("optuna_progress.png")
+            plt.close()
+            mlflow.log_artifact("optuna_progress.png")
+            os.remove("optuna_progress.png")
 
     except Exception as e:
-        logger.error(f"Ошибка в упрощенном log_with_mlflow: {e}")
+        logger.info(f"Ошибка: {e}")
         raise
 
 
@@ -462,7 +739,7 @@ if __name__ == "__main__":
     for col in int_cols_with_na:
         TRAIN_DATA[col] = TRAIN_DATA[col].astype("float64")
 
-    # Для остальных числовых столбцов можно сделать общий каст к float64 (опционально)
+    # Для остальных числовых столбцов можно к float64
     num_cols = TRAIN_DATA.select_dtypes(include=["number"]).columns
     TRAIN_DATA[num_cols] = TRAIN_DATA[num_cols].astype("float64")
 
@@ -470,10 +747,10 @@ if __name__ == "__main__":
     y_main = TRAIN_DATA[TARGET_COL]
 
     # Сетка параметров
-    fn_penalty_grid = range(1, 2)
-    fp_penalty_grid = range(1, 2)
-    fn_stop_grid = range(1, 2)
-    max_fn_soft_grid = range(1, 2)
+    fn_penalty_grid = range(1, 3)
+    fp_penalty_grid = range(1, 3)
+    fn_stop_grid = range(0, 3)
+    max_fn_soft_grid = range(0, 3)
 
     for fn_penalty, fp_penalty, fn_stop_val, max_fn_soft_val in product(
         fn_penalty_grid, fp_penalty_grid, fn_stop_grid, max_fn_soft_grid
