@@ -432,278 +432,36 @@ def log_with_mlflow(
     y_pred,
 ):
     try:
-        input_example = input_example.astype("float64").copy()
-        X_test = X_test.astype("float64").copy()
-
-        assert not input_example.isnull().any().any(), "input_example содержит NaN"
-        assert not X_test.isnull().any().any(), "X_test содержит NaN"
-
-        n_selected_features = len(selected_features)
-        cm_test = confusion_matrix(y_test, y_pred, labels=[0, 1])
-        tn, fp, fn, tp = get_confusion_counts(cm_test)
-
         if mlflow.active_run():
             mlflow.end_run()
 
         with mlflow.start_run(run_name=run_name):
+            # Лог параметров
             mlflow.log_params(best_params)
-            mlflow.log_param("test_size", TEST_SIZE)
-            mlflow.log_param("random_state", RANDOM_STATE)
-            mlflow.log_param("n_trials", n_trials)
-            mlflow.log_param("n_splits", N_SPLITS)
-            mlflow.log_param("model_type", "XGBClassifier")
             mlflow.log_param("threshold", round(best_threshold, 4))
-            mlflow.log_param(
-                "cv_best_threshold",
-                round(study.best_trial.user_attrs["best_threshold"], 4),
+            mlflow.log_param("n_trials", n_trials)
+            mlflow.log_param("model_type", "XGBClassifier")
+            mlflow.log_param("n_selected_features", len(selected_features))
+
+            # Лог метрик
+            for key in ["accuracy", "precision", "recall", "f1", "roc_auc"]:
+                mlflow.log_metric(f"{key}_train", round(final_metrics_train[key], 4))
+                mlflow.log_metric(f"{key}_test", round(final_metrics[key], 4))
+
+            # Создаем input_example из X_test (первой строки), явно задаем колонки
+            input_example = pd.DataFrame(X_test[:1], columns=X_test.columns)
+
+            mlflow.sklearn.log_model(  # type: ignore
+                final_model,
+                name="model",
+                input_example=input_example,
             )
 
-            mlflow.log_param("opt_metric", f"{metric}")
-            mlflow.log_metric("fn_test", fn)
-            mlflow.log_metric("fp_test", fp)
-
-            mlflow.log_metric("f1_train", round(final_metrics_train["f1"], 3))
-            mlflow.log_metric("f1_test", round(final_metrics["f1"], 3))
-
-            mlflow.log_metric(
-                "accuracy_train", round(final_metrics_train["accuracy"], 3)
-            )
-            mlflow.log_metric("accuracy_test", round(final_metrics["accuracy"], 3))
-
-            mlflow.log_metric("recall_train", round(final_metrics_train["recall"], 3))
-            mlflow.log_metric("recall_test", round(final_metrics["recall"], 3))
-
-            mlflow.log_metric(
-                "precision_train", round(final_metrics_train["precision"], 3)
-            )
-            mlflow.log_metric("precision_test", round(final_metrics["precision"], 3))
-
-            mlflow.log_metric("roc_auc_train", round(final_metrics_train["roc_auc"], 3))
-            mlflow.log_metric("roc_auc_test", round(final_metrics["roc_auc"], 3))
-
+            # Логируем сохраненный файл модели
             mlflow.log_artifact(model_output_path)
-            mlflow.sklearn.log_model(final_model, name="final_model", input_example=input_example)  # type: ignore
-
-            # матрица ошибок
-            fig_cm, ax_cm = plt.subplots()
-            ConfusionMatrixDisplay.from_predictions(y_test, y_pred, ax=ax_cm)
-            fig_cm.tight_layout()
-            fig_cm.savefig("confusion_matrix.png")
-            plt.close(fig_cm)
-            mlflow.log_artifact("confusion_matrix.png")
-            os.remove("confusion_matrix.png")
-
-            # ROC кривая
-            fig_roc, ax_roc = plt.subplots()
-            RocCurveDisplay.from_predictions(y_test, y_pred_proba, ax=ax_roc)
-            fig_roc.tight_layout()
-            fig_roc.savefig("roc_curve.png")
-            plt.close(fig_roc)
-            mlflow.log_artifact("roc_curve.png")
-            os.remove("roc_curve.png")
-
-            # SHAP
-            if hasattr(final_model, "feature_names_in_"):
-                X_test = X_test[final_model.feature_names_in_]
-
-            explainer = shap.Explainer(final_model, X_test)
-            shap_values = explainer(X_test, check_additivity=False)
-
-            # Берем SHAP только для класса 1
-            if shap_values.values.ndim == 3:
-                # мультиклассовая модель
-                shap_class_1 = shap_values.values[:, :, 1]
-            else:
-                # бинарная модель — shap для положительного класса
-                shap_class_1 = shap_values.values
-
-            # Строим dot plot
-            plt.figure()
-            shap.summary_plot(
-                shap_class_1, X_test, plot_type="dot", show=False, max_display=39
-            )
-            plt.tight_layout()
-            plt.savefig("shap_dot_plot.png")
-            plt.close()
-
-            # Логгируем артефакт в MLflow
-            mlflow.log_artifact("shap_dot_plot.png")
-            os.remove("shap_dot_plot.png")
-
-            # Threshold vs metrics
-            f1s, precisions, recalls = [], [], []
-            for t in THRESHOLDS:
-                y_pred_temp = (y_pred_proba >= t).astype(int)
-                p, r, f1, _ = precision_recall_fscore_support(
-                    y_test, y_pred_temp, average="binary", zero_division=0
-                )
-                f1s.append(f1)
-                precisions.append(p)
-                recalls.append(r)
-
-            plt.figure(figsize=(8, 6))
-            plt.plot(THRESHOLDS, f1s, label="F1")
-            plt.plot(THRESHOLDS, precisions, label="Precision")
-            plt.plot(THRESHOLDS, recalls, label="Recall")
-            plt.axvline(
-                float(best_threshold),
-                color="gray",
-                linestyle="--",
-                label=f"Threshold = {round(best_threshold, 3)}",
-            )
-            plt.xlabel("Threshold")
-            plt.ylabel("Score")
-            plt.title("Threshold vs F1 / Precision / Recall")
-            plt.legend()
-            plt.grid(True)
-            plt.tight_layout()
-            plt.savefig("threshold_metrics.png")
-            plt.close()
-            mlflow.log_artifact("threshold_metrics.png")
-            os.remove("threshold_metrics.png")
-
-            # Гистограмма предсказанных вероятностей
-            plt.figure(figsize=(8, 6))
-            plt.hist(y_pred_proba, bins=50, alpha=0.7)
-            plt.axvline(
-                float(best_threshold),
-                color="red",
-                linestyle="--",
-                label=f"Threshold = {round(best_threshold, 3)}",
-            )
-            plt.title("Distribution of predicted probabilities")
-            plt.xlabel("Probability")
-            plt.ylabel("Count")
-            plt.legend()
-            plt.grid(True)
-            plt.tight_layout()
-            plt.savefig("proba_distribution.png")
-            plt.close()
-            mlflow.log_artifact("proba_distribution.png")
-            os.remove("proba_distribution.png")
-
-            # TP/FP/FN/TN vs Threshold
-            tps, fps, fns, tns = [], [], [], []
-
-            for t in THRESHOLDS:
-                y_pred_temp = (y_pred_proba >= t).astype(int)
-                cm_temp = confusion_matrix(y_test, y_pred_temp, labels=[0, 1])
-                tn, fp, fn, tp = get_confusion_counts(cm_temp)
-                tps.append(tp)
-                fps.append(fp)
-                fns.append(fn)
-                tns.append(tn)
-
-            plt.figure(figsize=(8, 6))
-            plt.plot(THRESHOLDS, tps, label="TP")
-            plt.plot(THRESHOLDS, fps, label="FP")
-            plt.plot(THRESHOLDS, fns, label="FN")
-            plt.plot(THRESHOLDS, tns, label="TN")
-            plt.axvline(
-                float(best_threshold),
-                color="gray",
-                linestyle="--",
-                label=f"Threshold = {round(best_threshold, 3)}",
-            )
-            plt.xlabel("Threshold")
-            plt.ylabel("Count")
-            plt.title("TP / FP / FN / TN vs Threshold")
-            plt.legend()
-            plt.grid(True)
-            plt.tight_layout()
-            plt.savefig("threshold_confusion_counts.png")
-            plt.close()
-            mlflow.log_artifact("threshold_confusion_counts.png")
-            os.remove("threshold_confusion_counts.png")
-
-            selected_features_path = "selected_features.txt"
-            with open(selected_features_path, "w") as f:
-                for feat in selected_features:
-                    f.write(f"{feat}\n")
-
-            mlflow.log_param("n_selected_features", n_selected_features)
-            mlflow.log_artifact(selected_features_path)
-            os.remove(selected_features_path)
-
-            # хитмап
-            corr_matrix = X_test[selected_features].corr(method="pearson")
-            plt.figure(figsize=(12, 10))
-            sns.heatmap(
-                corr_matrix,
-                annot=True,
-                fmt=".2f",
-                cmap="coolwarm",
-                center=0,
-                square=True,
-                cbar_kws={"shrink": 0.75},
-                linewidths=0.5,
-                linecolor="gray",
-                annot_kws={"size": 6},
-            )
-            plt.title("Correlation Heatmap (Test Data)")
-            plt.tight_layout()
-            plt.savefig("correlation_heatmap.png")
-            plt.close()
-            mlflow.log_artifact("correlation_heatmap.png")
-            os.remove("correlation_heatmap.png")
-
-            # логирует пары с высокой кореляцией (|corr| > 0.9)
-            high_corr_output = "high_corr_pairs.txt"
-            corr_abs = corr_matrix.abs()
-            upper = corr_abs.where(np.triu(np.ones(corr_abs.shape), k=1).astype(bool))
-
-            with open(high_corr_output, "w") as f:
-                for col in upper.columns:
-                    for row in upper.index:
-                        val = upper.loc[row, col]
-                        if pd.notnull(val) and val > 0.9:
-                            f.write(f"{row} - {col}: {val:.3f}\n")
-
-            mlflow.log_artifact(high_corr_output)
-            os.remove(high_corr_output)
-
-            params_path = "best_params.json"
-            with open(params_path, "w") as f:
-                json.dump(best_params, f, indent=4)
-
-            mlflow.log_artifact(params_path)
-            os.remove(params_path)
-
-            experiment_config = {
-                "TEST_SIZE": TEST_SIZE,
-                "RANDOM_STATE": RANDOM_STATE,
-                "N_TRIALS": N_TRIALS,
-                "N_SPLITS": N_SPLITS,
-                "METRIC": METRIC,
-                "TARGET_COL": TARGET_COL,
-                "FN_PENALTY_WEIGHT": FN_PENALTY_WEIGHT,
-                "FP_PENALTY_WEIGHT": FP_PENALTY_WEIGHT,
-                "MIN_PRECISION": MIN_PRECISION,
-                "FN_STOP": FN_STOP,
-            }
-
-            with open("experiment_config.json", "w") as f:
-                json.dump(experiment_config, f, indent=4)
-            mlflow.log_artifact("experiment_config.json")
-            os.remove("experiment_config.json")
-
-            # Log Optuna optimization progress (trial score per iteration)
-            scores = [trial.value for trial in study.trials if trial.value is not None]
-
-            plt.figure(figsize=(10, 6))
-            plt.plot(scores, marker="o", linestyle="-", alpha=0.8)
-            plt.xlabel("Trial Number")
-            plt.ylabel("Score")
-            plt.title("Optuna Optimization Progress")
-            plt.grid(True)
-            plt.tight_layout()
-            plt.savefig("optuna_progress.png")
-            plt.close()
-            mlflow.log_artifact("optuna_progress.png")
-            os.remove("optuna_progress.png")
 
     except Exception as e:
-        logger.info(f"Ошибка: {e}")
+        logger.error(f"Ошибка в упрощенном log_with_mlflow: {e}")
         raise
 
 
