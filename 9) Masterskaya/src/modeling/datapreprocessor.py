@@ -11,15 +11,16 @@ class DataPreProcessor:
         self,
         drop_cols=None,
         ohe_cols=None,
+        name=None,
         processed_dir="../data/processed/",
         models_dir="../models/",
     ):
         self.drop_cols = drop_cols or []
         self.ohe_cols = ohe_cols or []
+        self.name = name or "default"
         self.processed_dir = processed_dir
         self.models_dir = models_dir
-        self.encoder = None
-
+        self.pipeline = None  # <-- Объединённый pipeline (encoder + scaler)
         os.makedirs(self.processed_dir, exist_ok=True)
         os.makedirs(self.models_dir, exist_ok=True)
 
@@ -47,37 +48,23 @@ class DataPreProcessor:
         )
         return df
 
-    def fit_transform(self, df: pd.DataFrame):
-        # Удаляем служебные колонки
-        for col in ["Unnamed: 0", "id"]:
+    def _preprocess_base(self, df: pd.DataFrame, is_fit: bool = False) -> pd.DataFrame:
+        # Удаляем служебные колонки (только при transform и fit_transform)
+        for col in ["Unnamed: 0", "unnamed:_0"]:
             if col in df.columns:
                 df = df.drop(columns=[col])
 
         # Очистка колонок и строк
         df = self.clean_column_names(df)
 
-        # Заполнение пропусков -1
+        # Заполнение пропусков
         df.fillna(-1, inplace=True)
 
         # Фильтрация пола
         df["gender"] = df["gender"].replace({"1.0": "male", "0.0": "female"})
 
-        # Удаление заданных колонок
+        # Удаляем drop_cols
         df = df.drop(columns=self.drop_cols, errors="ignore")
-
-        # One-Hot кодирование
-        self.encoder = OneHotEncoder(sparse_output=False, drop="first")
-
-        valid_ohe_cols = [col for col in self.ohe_cols if df[col].nunique() > 1]
-
-        if valid_ohe_cols:
-            encoded = self.encoder.fit_transform(df[valid_ohe_cols])
-            encoded_df = pd.DataFrame(
-                encoded,
-                columns=self.encoder.get_feature_names_out(valid_ohe_cols),
-                index=df.index,
-            ).astype("float64")
-            df = pd.concat([df.drop(columns=valid_ohe_cols), encoded_df], axis=1)
 
         # Генерация новых признаков
         required_cols = [
@@ -116,21 +103,77 @@ class DataPreProcessor:
             df["systolic_blood_pressure"] + df["diastolic_blood_pressure"]
         ) / 2
 
-        # Масштабирование числовых колонок
+        return df
+
+    def fit_transform(self, df: pd.DataFrame):
+        df = self._preprocess_base(df, is_fit=True)
+
+        # One-Hot кодирование (fit + transform)
+        self.encoder = OneHotEncoder(sparse_output=False, drop="first")
+        valid_ohe_cols = [
+            col for col in self.ohe_cols if col in df.columns and df[col].nunique() > 1
+        ]
+
+        if valid_ohe_cols:
+            encoded = self.encoder.fit_transform(df[valid_ohe_cols])
+            encoded_df = pd.DataFrame(
+                encoded,
+                columns=self.encoder.get_feature_names_out(valid_ohe_cols),
+                index=df.index,
+            ).astype("float64")
+            df = pd.concat([df.drop(columns=valid_ohe_cols), encoded_df], axis=1)
+
+        # Масштабирование числовых колонок (fit + transform)
         numeric_cols = df.select_dtypes(include=["float64", "int64"]).columns
-        scaler = RobustScaler()
-        df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
+        self.scaler = RobustScaler()
+        df[numeric_cols] = self.scaler.fit_transform(df[numeric_cols])
 
         # Удаление дубликатов
         df = df.drop_duplicates()
 
-        # Сохранение результата
-        df.to_csv(os.path.join(self.processed_dir, "train_data.csv"), index=False)
-
-        # Сохраняем pipeline (OneHotEncoder + Scaler)
-        pipeline_object = Pipeline(
-            steps=[("encoder", self.encoder), ("scaler", scaler)]
+        # Сохраняем pipeline
+        self.pipeline = Pipeline(
+            steps=[
+                ("encoder", self.encoder),
+                ("scaler", self.scaler),
+            ]
         )
-        joblib.dump(pipeline_object, os.path.join(self.models_dir, "preprocessor.pkl"))
+        joblib.dump(
+            self.pipeline,
+            os.path.join(self.models_dir, f"{self.name}_preprocessor.pkl"),
+        )
+
+        # Сохраняем результат
+        df.to_csv(os.path.join(self.processed_dir, "train_data.csv"), index=False)
+        return df
+
+    def transform(self, df: pd.DataFrame):
+        if self.pipeline is None:
+            self.pipeline = joblib.load(
+                os.path.join(self.models_dir, f"{self.name}_preprocessor.pkl")
+            )
+        self.encoder = self.pipeline.named_steps["encoder"]
+        self.scaler = self.pipeline.named_steps["scaler"]
+
+        df = self._preprocess_base(df, is_fit=False)
+
+        # One-Hot трансформация (transform)
+        valid_ohe_cols = [
+            col for col in self.ohe_cols if col in df.columns and df[col].nunique() > 1
+        ]
+        if valid_ohe_cols:
+            encoded = self.encoder.transform(df[valid_ohe_cols])
+            encoded_df = pd.DataFrame(
+                encoded,
+                columns=self.encoder.get_feature_names_out(valid_ohe_cols),
+                index=df.index,
+            ).astype("float64")
+            df = pd.concat([df.drop(columns=valid_ohe_cols), encoded_df], axis=1)
+
+        # Масштабирование числовых колонок (transform)
+        numeric_cols = df.select_dtypes(include=["float64", "int64"]).columns
+        df[numeric_cols] = self.scaler.transform(df[numeric_cols])
+
+        df = df.drop_duplicates()
 
         return df
