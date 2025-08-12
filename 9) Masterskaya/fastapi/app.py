@@ -16,7 +16,6 @@ model_bundle = joblib.load(MODEL_PATH)
 model = model_bundle["model"]  # XGBClassifier
 threshold = model_bundle["threshold"]
 selected_features = model_bundle["selected_features"]
-print(selected_features)
 
 preprocessor = joblib.load(PREPROCESSOR_PATH)
 
