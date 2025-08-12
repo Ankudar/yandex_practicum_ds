@@ -88,7 +88,7 @@ def manual_optuna_progress(study, n_trials, func):
         study.optimize(func, n_trials=1, catch=(Exception,))
 
 
-def objective(trial, X_train, y_train, all_columns):
+def objective(trial, X_train, y_train):
     """
     Целевая функция Optuna для подбора гиперпараметров модели XGBoost с отбором признаков.
 
@@ -105,8 +105,6 @@ def objective(trial, X_train, y_train, all_columns):
         Признаки обучающей выборки.
     y_train : pd.Series
         Целевая переменная обучающей выборки.
-    all_columns : list
-        Список всех признаков.
 
     Возвращает
     ----------
@@ -290,7 +288,7 @@ def run_optuna_experiment(
         mlflow.set_experiment(experiment_name)
 
         def optuna_objective(trial):
-            return objective(trial, X_train, y_train, X_train.columns)
+            return objective(trial, X_train, y_train)
 
         study = optuna.create_study(study_name=experiment_name, direction="maximize")
         manual_optuna_progress(study, n_trials, optuna_objective)
@@ -769,10 +767,8 @@ if __name__ == "__main__":
     y_main = TRAIN_DATA[TARGET_COL]
 
     # Сетка параметров
-    # fn_penalty_grid = range(1, 3)
-    # fp_penalty_grid = range(1, 3)
-    fn_penalty_grid = np.arange(0.1, 2, 0.5)
-    fp_penalty_grid = np.arange(0.1, 2, 0.5)
+    fn_penalty_grid = np.arange(0, 3, 0.5)
+    fp_penalty_grid = np.arange(0, 3, 0.5)
     fn_stop_grid = range(0, 3)
     max_fn_soft_grid = range(0, 3)
 
