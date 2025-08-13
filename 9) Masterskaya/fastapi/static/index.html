@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Предсказания модели</title>
+</head>
+<body>
+  <h2>Предсказания модели</h2>
+
+  <input type="file" id="fileInput">
+  <button onclick="uploadFile()">Отправить CSV</button>
+
+  <p><a id="download-link" href="" target="_blank">Скачать результаты</a>
+  <div id="summary"></div>
+
+  <table id="predictions-table" border="1">
+    <thead>
+      <tr><th>ID</th><th>Prediction</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+
+
+  <script>
+    async function uploadFile() {
+      const fileInput = document.getElementById("fileInput");
+      if (!fileInput.files.length) return alert("Выберите CSV файл");
+
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+
+      const response = await fetch("/predict", { method: "POST", body: formData });
+      const data = await response.json();
+
+      if (data.status !== "success") return alert("Ошибка: " + data.error);
+
+      document.getElementById("summary").innerText =
+        `Всего строк: ${data.summary.total_rows}, Positive: ${data.summary.positive}, Negative: ${data.summary.negative}`;
+
+      const tbody = document.querySelector("#predictions-table tbody");
+      tbody.innerHTML = "";
+      Object.entries(data.predictions).forEach(([id, pred]) => {
+        tbody.innerHTML += `<tr><td>${id}</td><td>${pred}</td></tr>`;
+      });
+
+      document.getElementById("download-link").href = data.download_url;
+    }
+  </script>
+</body>
+</html>

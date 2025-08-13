@@ -5,6 +5,7 @@ sys.path.append("./src/modeling/")
 import logging
 import os
 
+import joblib
 import pandas as pd
 from datapreprocessor import DataPreProcessor
 
@@ -25,7 +26,6 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 def main():
     try:
-        import joblib
 
         model_bundle = joblib.load(MODEL)
         model = model_bundle["model"]

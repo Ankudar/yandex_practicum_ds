@@ -1,6 +1,7 @@
 import sys
 
 sys.path.append("../src/modeling/")
+
 from io import BytesIO
 from pathlib import Path
 
@@ -25,10 +26,18 @@ model = model_bundle["model"]
 threshold = model_bundle["threshold"]
 selected_features = model_bundle.get("selected_features", None)
 
-preprocessor = joblib.load(PREPROCESSOR_PATH)
+preprocessor_pipeline = joblib.load(PREPROCESSOR_PATH)
 
-# Монтируем директорию для отдачи сохранённых файлов
+# Монтируем статику (HTML)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/results", StaticFiles(directory=RESULTS_DIR), name="results")
+
+
+@app.get("/")
+async def root():
+    return JSONResponse(
+        content={"message": "Перейдите на http://localhost:8000/static/index.html"}
+    )
 
 
 @app.post("/predict")
@@ -43,15 +52,12 @@ async def predict(file: UploadFile = File(...)):
                 content={"error": "CSV должен содержать колонку 'id'"},
             )
 
-        # Инициализация препроцессора с параметрами
+        # Инициализация препроцессора
         drop_cols = ["income", "ck-mb", "troponin"]
         ohe_cols = ["gender"]
         preprocessor = DataPreProcessor(drop_cols=drop_cols, ohe_cols=ohe_cols)
+        preprocessor.pipeline = preprocessor_pipeline
 
-        # Загружаем сохранённый pipeline в препроцессор
-        preprocessor.pipeline = joblib.load(PREPROCESSOR_PATH)
-
-        # Полная предобработка
         df_processed = preprocessor.transform(df)
 
         # Оставляем нужные признаки
@@ -76,23 +82,29 @@ async def predict(file: UploadFile = File(...)):
 
         result_df = pd.DataFrame({"id": df["id"], "prediction": preds})
 
-        # Сохраняем результат с суффиксом _pred.csv
+        # Сохраняем CSV
         orig_name = Path(file.filename).stem
         save_path = RESULTS_DIR / f"{orig_name}_pred.csv"
         result_df.to_csv(save_path, index=False)
 
-        # Формируем JSON для ответа
+        # JSON для фронтенда
         result_json = {
             str(row["id"]): int(row["prediction"]) for _, row in result_df.iterrows()
         }
 
         return {
-            "message": "Файл с предсказаниями сохранён. По ссылке можно скачать CSV.",
-            "download_url": f"http://localhost:8000/results/{save_path.name}",
+            "status": "success",
+            "message": "Файл с предсказаниями сохранён.",
+            "download_url": f"/results/{save_path.name}",
+            "summary": {
+                "total_rows": len(result_df),
+                "positive": int(preds.sum()),
+                "negative": int((preds == 0).sum()),
+            },
             "predictions": result_json,
         }
+
     except Exception as e:
         return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
+            status_code=500, content={"status": "failed", "error": str(e)}
         )
