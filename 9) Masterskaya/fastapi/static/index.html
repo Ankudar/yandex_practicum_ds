@@ -2,13 +2,13 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Предсказания модели инфаркта</title>
+  <title>Риск возникновения инфаркта</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     input, select, button { margin: 5px 5px 5px 0; }
     table { border-collapse: collapse; width: 100%; margin-top: 15px; display: none; }
-    th, td { padding: 8px; text-align: center; border: 1px solid #ddd; }
+    th, td { padding: 8px; text-align: center; border: 1px solid #ddd; cursor: pointer; }
     th { background-color: #f2f2f2; }
     tr:hover { opacity: 0.8; }
     #summary { margin-top: 10px; font-weight: bold; }
@@ -20,7 +20,7 @@
   </style>
 </head>
 <body>
-  <h2>Предсказания модели инфаркта</h2>
+  <h2>Риск возникновения инфаркта</h2>
 
   <div id="controls">
     <input type="file" id="fileInput">
@@ -62,9 +62,9 @@
   <table id="predictions-table">
     <thead>
       <tr>
-        <th>ID</th>
-        <th>Prediction</th>
-        <th>Probability</th>
+        <th onclick="sortTable('id')">ID</th>
+        <th onclick="sortTable('prediction')">Prediction</th>
+        <th onclick="sortTable('probability')">Probability</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -72,6 +72,7 @@
 
   <script>
     let fullData = [];
+    let currentSort = { column: null, ascending: true };
     let riskChartInstance = null;
 
     async function uploadFile() {
@@ -86,29 +87,24 @@
 
       if (data.status !== "success") return alert("Ошибка: " + data.error);
 
-      // Обновление summary
       document.getElementById("summary").innerText =
         `Всего строк: ${data.summary.total_rows}, Positive: ${data.summary.positive}, Negative: ${data.summary.negative}`;
 
-      // Подготовка данных
       fullData = Object.entries(data.predictions).map(([id, pred]) => ({
         id,
         prediction: pred,
         probability: data.probabilities[id]
       }));
 
-      // Показ таблицы и фильтра
       document.getElementById("predictions-table").style.display = "table";
       document.getElementById("filter-panel").style.display = "block";
       document.getElementById("download-links").style.display = "block";
 
       renderTable(fullData);
 
-      // Обновление ссылок
       document.getElementById("download-csv").href = data.download_csv;
       document.getElementById("download-json").href = data.download_json;
 
-      // График
       const ctx = document.getElementById('riskChart').getContext('2d');
       if (riskChartInstance) riskChartInstance.destroy();
       riskChartInstance = new Chart(ctx, {
@@ -132,7 +128,7 @@
       const tbody = document.querySelector("#predictions-table tbody");
       tbody.innerHTML = "";
       data.forEach(row => {
-        const color = row.probability >= 0.5 ? "#ffcccc" : "#ccffcc";
+        const color = row.prediction == 1 ? "#ffcccc" : "#ccffcc";
         tbody.innerHTML += `<tr style="background-color:${color}"><td>${row.id}</td><td>${row.prediction}</td><td>${row.probability.toFixed(2)}</td></tr>`;
       });
     }
@@ -156,6 +152,23 @@
 
     function resetFilter() {
       document.getElementById("filter-value").value = "";
+      renderTable(fullData);
+    }
+
+    function sortTable(column) {
+      const ascending = (currentSort.column === column) ? !currentSort.ascending : true;
+      currentSort = { column, ascending };
+
+      fullData.sort((a, b) => {
+        const valA = a[column];
+        const valB = b[column];
+        if (!isNaN(valA) && !isNaN(valB)) {
+          return ascending ? valA - valB : valB - valA;
+        } else {
+          return ascending ? String(valA).localeCompare(String(valB)) : String(valB).localeCompare(String(valA));
+        }
+      });
+
       renderTable(fullData);
     }
   </script>

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-from datapreprocessor import DataPreProcessor # type: ignore
+from datapreprocessor import DataPreProcessor  # type: ignore
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -84,7 +84,7 @@ async def predict(file: UploadFile = File(...)):
         }
 
         # Сохраняем CSV и JSON
-        orig_name = Path(file.filename).stem # type: ignore
+        orig_name = Path(file.filename).stem  # type: ignore
         csv_path = RESULTS_DIR / f"{orig_name}_pred.csv"
         json_path = RESULTS_DIR / f"{orig_name}_pred.json"
 
