@@ -2,28 +2,78 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Предсказания модели</title>
+  <title>Предсказания модели инфаркта</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    input, select, button { margin: 5px 5px 5px 0; }
+    table { border-collapse: collapse; width: 100%; margin-top: 15px; display: none; }
+    th, td { padding: 8px; text-align: center; border: 1px solid #ddd; }
+    th { background-color: #f2f2f2; }
+    tr:hover { opacity: 0.8; }
+    #summary { margin-top: 10px; font-weight: bold; }
+    #chart-container { width: 50%; height: 40vh; float: left; margin-bottom: 20px; }
+    #riskChart { width: 100% !important; height: 100% !important; }
+    #filter-panel { margin-top: 15px; clear: both; display: none; text-align: left; }
+    #controls { margin-bottom: 15px; clear: both; }
+    #download-links { margin-top: 10px; display: none; text-align: left; }
+  </style>
 </head>
 <body>
-  <h2>Предсказания модели</h2>
+  <h2>Предсказания модели инфаркта</h2>
 
-  <input type="file" id="fileInput">
-  <button onclick="uploadFile()">Отправить CSV</button><p><p>
-  <a id="download-csv" href="" target="_blank">Скачать результат - CSV</a> |
-  <a id="download-json" href="" target="_blank">Скачать результат - JSON</a>
+  <div id="controls">
+    <input type="file" id="fileInput">
+    <p><button onclick="uploadFile()">Отправить CSV</button>
+  </div>
 
   <div id="summary"></div>
 
-  <table id="predictions-table" border="1">
+  <div id="chart-container">
+    <canvas id="riskChart"></canvas>
+  </div>
+
+  <div id="filter-panel">
+    <label>Столбец: 
+      <select id="filter-column">
+        <option value="id">ID</option>
+        <option value="prediction">Prediction</option>
+        <option value="probability">Probability</option>
+      </select>
+    </label>
+    <label>Условие: 
+      <select id="filter-condition">
+        <option value="contains">Содержит</option>
+        <option value="equals">Равно</option>
+        <option value="gt">Больше</option>
+        <option value="lt">Меньше</option>
+      </select>
+    </label>
+    <label>Значение: <input type="text" id="filter-value"></label>
+    <button onclick="applyFilter()">Применить фильтр</button>
+    <button onclick="resetFilter()">Сбросить фильтры</button>
+  </div>
+
+  <div id="download-links">
+    <a id="download-csv" href="" target="_blank">Скачать результат - CSV</a> |
+    <a id="download-json" href="" target="_blank">Скачать результат - JSON</a>
+  </div>
+
+  <table id="predictions-table">
     <thead>
-      <tr><th>ID</th><th>Prediction</th></tr>
+      <tr>
+        <th>ID</th>
+        <th>Prediction</th>
+        <th>Probability</th>
+      </tr>
     </thead>
     <tbody></tbody>
   </table>
 
-
-
   <script>
+    let fullData = [];
+    let riskChartInstance = null;
+
     async function uploadFile() {
       const fileInput = document.getElementById("fileInput");
       if (!fileInput.files.length) return alert("Выберите CSV файл");
@@ -36,17 +86,77 @@
 
       if (data.status !== "success") return alert("Ошибка: " + data.error);
 
+      // Обновление summary
       document.getElementById("summary").innerText =
         `Всего строк: ${data.summary.total_rows}, Positive: ${data.summary.positive}, Negative: ${data.summary.negative}`;
 
-      const tbody = document.querySelector("#predictions-table tbody");
-      tbody.innerHTML = "";
-      Object.entries(data.predictions).forEach(([id, pred]) => {
-        tbody.innerHTML += `<tr><td>${id}</td><td>${pred}</td></tr>`;
-      });
+      // Подготовка данных
+      fullData = Object.entries(data.predictions).map(([id, pred]) => ({
+        id,
+        prediction: pred,
+        probability: data.probabilities[id]
+      }));
 
+      // Показ таблицы и фильтра
+      document.getElementById("predictions-table").style.display = "table";
+      document.getElementById("filter-panel").style.display = "block";
+      document.getElementById("download-links").style.display = "block";
+
+      renderTable(fullData);
+
+      // Обновление ссылок
       document.getElementById("download-csv").href = data.download_csv;
       document.getElementById("download-json").href = data.download_json;
+
+      // График
+      const ctx = document.getElementById('riskChart').getContext('2d');
+      if (riskChartInstance) riskChartInstance.destroy();
+      riskChartInstance = new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: ['Низкий риск', 'Высокий риск'],
+          datasets: [{
+            data: [data.summary.negative, data.summary.positive],
+            backgroundColor: ['#28a745','#dc3545']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: true, position: 'bottom' } }
+        }
+      });
+    }
+
+    function renderTable(data) {
+      const tbody = document.querySelector("#predictions-table tbody");
+      tbody.innerHTML = "";
+      data.forEach(row => {
+        const color = row.probability >= 0.5 ? "#ffcccc" : "#ccffcc";
+        tbody.innerHTML += `<tr style="background-color:${color}"><td>${row.id}</td><td>${row.prediction}</td><td>${row.probability.toFixed(2)}</td></tr>`;
+      });
+    }
+
+    function applyFilter() {
+      const col = document.getElementById("filter-column").value;
+      const cond = document.getElementById("filter-condition").value;
+      const val = document.getElementById("filter-value").value;
+
+      const filtered = fullData.filter(row => {
+        const cell = row[col];
+        if (cond === "contains") return String(cell).includes(val);
+        if (cond === "equals") return String(cell) === val;
+        if (cond === "gt") return parseFloat(cell) > parseFloat(val);
+        if (cond === "lt") return parseFloat(cell) < parseFloat(val);
+        return true;
+      });
+
+      renderTable(filtered);
+    }
+
+    function resetFilter() {
+      document.getElementById("filter-value").value = "";
+      renderTable(fullData);
     }
   </script>
 </body>

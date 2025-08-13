@@ -71,9 +71,16 @@ async def predict(file: UploadFile = File(...)):
 
         proba = model.predict_proba(X)[:, 1]
         preds = (proba >= threshold).astype(int)
-        result_df = pd.DataFrame({"id": df["id"], "prediction": preds})
+
+        result_df = pd.DataFrame(
+            {"id": df["id"], "prediction": preds, "probability": proba}
+        )
+
         result_json = {
             str(row["id"]): int(row["prediction"]) for _, row in result_df.iterrows()
+        }
+        prob_json = {
+            str(row["id"]): float(row["probability"]) for _, row in result_df.iterrows()
         }
 
         # Сохраняем CSV и JSON
@@ -95,6 +102,7 @@ async def predict(file: UploadFile = File(...)):
                 "negative": int((preds == 0).sum()),
             },
             "predictions": result_json,
+            "probabilities": prob_json,
         }
 
     except Exception as e:
