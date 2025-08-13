@@ -8,9 +8,10 @@
   <h2>Предсказания модели</h2>
 
   <input type="file" id="fileInput">
-  <button onclick="uploadFile()">Отправить CSV</button>
+  <button onclick="uploadFile()">Отправить CSV</button><p><p>
+  <a id="download-csv" href="" target="_blank">Скачать результат - CSV</a> |
+  <a id="download-json" href="" target="_blank">Скачать результат - JSON</a>
 
-  <p><a id="download-link" href="" target="_blank">Скачать результаты</a>
   <div id="summary"></div>
 
   <table id="predictions-table" border="1">
@@ -44,7 +45,8 @@
         tbody.innerHTML += `<tr><td>${id}</td><td>${pred}</td></tr>`;
       });
 
-      document.getElementById("download-link").href = data.download_url;
+      document.getElementById("download-csv").href = data.download_csv;
+      document.getElementById("download-json").href = data.download_json;
     }
   </script>
 </body>
