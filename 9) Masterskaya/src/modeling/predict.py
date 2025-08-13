@@ -1,13 +1,14 @@
-import sys
-
-sys.path.append("./src/modeling/")
-
 import logging
 import os
+import sys
 
 import joblib
 import pandas as pd
-from datapreprocessor import DataPreProcessor
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+
+from src.config import DROP_COLS, OHE_COLS
+from src.modeling.datapreprocessor import DataPreProcessor
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"

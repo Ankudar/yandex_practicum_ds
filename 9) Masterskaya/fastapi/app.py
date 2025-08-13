@@ -1,16 +1,19 @@
+import os
 import sys
-
-sys.path.append("../src/modeling/")
-
 from io import BytesIO
 from pathlib import Path
 
 import joblib
 import pandas as pd
-from datapreprocessor import DataPreProcessor  # type: ignore
 from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent  # fastapi/.. -> 9) Masterskaya
+sys.path.append(str(PROJECT_ROOT / "src"))  # Добавляем src в путь
+
+from config import DROP_COLS, OHE_COLS  # type: ignore
+from modeling.datapreprocessor import DataPreProcessor  # type: ignore
 
 app = FastAPI()
 
@@ -48,9 +51,7 @@ async def predict(file: UploadFile = File(...)):
                 status_code=400, content={"error": "CSV должен содержать колонку 'id'"}
             )
 
-        drop_cols = ["income", "ck-mb", "troponin"]
-        ohe_cols = ["gender"]
-        preprocessor = DataPreProcessor(drop_cols=drop_cols, ohe_cols=ohe_cols)
+        preprocessor = DataPreProcessor(drop_cols=DROP_COLS, ohe_cols=OHE_COLS)
         preprocessor.pipeline = preprocessor_pipeline
         df_processed = preprocessor.transform(df)
 
