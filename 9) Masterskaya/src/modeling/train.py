@@ -51,7 +51,7 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
 
 TEST_SIZE = 0.25
 RANDOM_STATE = 40
-N_TRIALS = 2
+N_TRIALS = 100
 N_SPLITS = 5
 METRIC = "f2"
 TARGET_COL = "heart_attack_risk_(binary)"
@@ -767,7 +767,7 @@ if __name__ == "__main__":
     y_main = TRAIN_DATA[TARGET_COL]
 
     # Сетка параметров для полбора лучших
-    fn_penalty_grid = np.arange(0, 1, 0.5)
+    fn_penalty_grid = np.arange(0, 0.1, 0.5)
     fp_penalty_grid = np.arange(0.5, 0.6, 0.5)
     fn_stop_grid = range(0, 1)
     max_fn_soft_grid = range(2, 3)

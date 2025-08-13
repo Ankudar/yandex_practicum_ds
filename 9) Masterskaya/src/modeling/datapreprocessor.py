@@ -96,9 +96,9 @@ class DataPreProcessor:
             df["obesity"] * df["exercise_hours_per_week"]
         )
         df["age_smoking_interaction"] = df["age"] * df["smoking"]
-        df["stress_sedentary_ratio"] = df["stress_level"] / (
-            df["sedentary_hours_per_day"] + 1
-        )
+        # df["stress_sedentary_ratio"] = df["stress_level"] / (
+        #     df["sedentary_hours_per_day"] + 1
+        # )
         df["bp_mean"] = (
             df["systolic_blood_pressure"] + df["diastolic_blood_pressure"]
         ) / 2
