@@ -43,7 +43,7 @@ class DataPreProcessor:
             self.replace_spaces(self.process_spaces(col)).lower() for col in df.columns
         ]
         # Очистка строковых значений во всех ячейках
-        df = df.applymap(
+        df = df.map(
             lambda x: self.process_spaces(x).lower() if isinstance(x, str) else x
         )
         return df
