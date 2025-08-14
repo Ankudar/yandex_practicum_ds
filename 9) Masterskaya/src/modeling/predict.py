@@ -1,3 +1,4 @@
+import glob
 import logging
 import os
 import sys
@@ -17,8 +18,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL = os.path.join(BASE_DIR, "..", "..", "models", "heart_pred.pkl")
-PREPROCESSOR = os.path.join(BASE_DIR, "..", "..", "models", "train_preprocessor.pkl")
+MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
+
+# Поиск самой свежей модели по маске heart_pred_*.pkl
+model_files = sorted(
+    glob.glob(os.path.join(MODELS_DIR, "heart_pred_*.pkl")),
+    key=os.path.getmtime,
+    reverse=True,
+)
+if not model_files:
+    raise FileNotFoundError("Не найдено ни одной модели 'heart_pred_*.pkl'")
+MODEL = model_files[0]
+
+# Препроцессор без изменений
+PREPROCESSOR = os.path.join(MODELS_DIR, "train_preprocessor.pkl")
+
 TEST_DATA_PATH = os.path.join(BASE_DIR, "..", "..", "data", "raw", "heart_test.csv")
 RESULTS_DIR = os.path.join(BASE_DIR, "..", "..", "data", "results")
 RESULT_FILE = os.path.join(RESULTS_DIR, "heart_predictions.csv")

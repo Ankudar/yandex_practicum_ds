@@ -811,6 +811,6 @@ if __name__ == "__main__":
             metric=METRIC,
             n_trials=N_TRIALS,
             experiment_name=f"{MLFLOW_EXPERIMENT}",
-            model_output_path=f"{MODELS_DIR}/heart_pred.pkl",
+            model_output_path=f"{MODELS_DIR}/heart_pred_{today()}.pkl",
             current_time=today(),
         )

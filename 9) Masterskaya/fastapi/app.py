@@ -1,3 +1,4 @@
+import glob
 import os
 import sys
 from io import BytesIO
@@ -10,19 +11,29 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent  # fastapi/.. -> 9) Masterskaya
-sys.path.append(str(PROJECT_ROOT / "src"))  # Добавляем src в путь
+sys.path.append(str(PROJECT_ROOT))  # Добавляем src в путь
 
-from config import DROP_COLS, OHE_COLS, ORD_COLS, TARGET_COL  # type: ignore
-from modeling.datapreprocessor import DataPreProcessor  # type: ignore
+from src.config import DROP_COLS, OHE_COLS, ORD_COLS, TARGET_COL  # type: ignore
+from src.modeling.datapreprocessor import DataPreProcessor  # type: ignore
 
 app = FastAPI()
 
-MODEL_PATH = "../models/heart_pred.pkl"
+
 PREPROCESSOR_PATH = "../models/train_preprocessor.pkl"
 RESULTS_DIR = Path("../data/results")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-model_bundle = joblib.load(MODEL_PATH)
+MODELS_DIR = Path("../models")
+model_files = sorted(
+    MODELS_DIR.glob("heart_pred_*.pkl"), key=os.path.getmtime, reverse=True
+)
+if not model_files:
+    raise FileNotFoundError(
+        "Не найдено ни одной модели 'heart_pred_*.pkl' в папке models"
+    )
+
+MODEL = model_files[0]
+model_bundle = joblib.load(MODEL)
 model = model_bundle["model"]
 threshold = model_bundle["threshold"]
 selected_features = model_bundle.get("selected_features", None)

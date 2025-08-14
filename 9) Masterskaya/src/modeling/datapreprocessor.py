@@ -43,7 +43,7 @@ class DataPreProcessor:
 
     def clean_column_names(self, df):
         df.columns = [self._normalize_name(col) for col in df.columns]
-        return df.applymap(
+        return df.map(
             lambda x: (
                 re.sub(r"\s+", " ", str(x)).strip().lower() if isinstance(x, str) else x
             )
