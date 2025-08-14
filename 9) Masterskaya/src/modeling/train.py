@@ -52,7 +52,7 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
 TEST_SIZE = 0.25
 RANDOM_STATE = 40
 N_TRIALS = 200  # число итераций для оптуны
-N_SPLITS = 5  # cv split
+N_SPLITS = 10  # cv split
 METRIC = "f2"
 TARGET_COL = "heart_attack_risk_(binary)"
 N_JOBS = -1
@@ -769,8 +769,8 @@ if __name__ == "__main__":
     # Сетка параметров для полбора лучших
     fn_penalty_grid = np.arange(0, 2, 0.5)
     fp_penalty_grid = np.arange(0, 2, 0.5)
-    fn_stop_grid = range(0, 1)
-    max_fn_soft_grid = range(0, 1)
+    fn_stop_grid = range(0, 2)
+    max_fn_soft_grid = range(0, 2)
 
     for fn_penalty, fp_penalty, fn_stop_val, max_fn_soft_val in product(
         fn_penalty_grid, fp_penalty_grid, fn_stop_grid, max_fn_soft_grid
