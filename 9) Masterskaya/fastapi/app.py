@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 PROJECT_ROOT = Path(__file__).resolve().parent.parent  # fastapi/.. -> 9) Masterskaya
 sys.path.append(str(PROJECT_ROOT / "src"))  # Добавляем src в путь
 
-from config import DROP_COLS, OHE_COLS  # type: ignore
+from config import DROP_COLS, OHE_COLS, ORD_COLS, TARGET_COL  # type: ignore
 from modeling.datapreprocessor import DataPreProcessor  # type: ignore
 
 app = FastAPI()
@@ -28,6 +28,10 @@ threshold = model_bundle["threshold"]
 selected_features = model_bundle.get("selected_features", None)
 
 preprocessor_pipeline = joblib.load(PREPROCESSOR_PATH)
+preprocessor = DataPreProcessor(
+    drop_cols=DROP_COLS, ohe_cols=OHE_COLS, ord_cols=ORD_COLS, name="train"
+)
+preprocessor.pipeline = preprocessor_pipeline
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/results", StaticFiles(directory=RESULTS_DIR), name="results")
@@ -51,8 +55,6 @@ async def predict(file: UploadFile = File(...)):
                 status_code=400, content={"error": "CSV должен содержать колонку 'id'"}
             )
 
-        preprocessor = DataPreProcessor(drop_cols=DROP_COLS, ohe_cols=OHE_COLS)
-        preprocessor.pipeline = preprocessor_pipeline
         df_processed = preprocessor.transform(df)
 
         if selected_features:

@@ -1,8 +1,10 @@
 import json
 import logging
 import os
+import sys
 from datetime import datetime
 from itertools import product
+from pathlib import Path
 
 import joblib
 import matplotlib.pyplot as plt
@@ -31,6 +33,10 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from tqdm import tqdm
 from xgboost import XGBClassifier
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent  # /src/modeling -> /src
+sys.path.append(str(PROJECT_ROOT))  # теперь добавляем /src
+from config import TARGET_COL
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -51,10 +57,9 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
 
 TEST_SIZE = 0.25
 RANDOM_STATE = 40
-N_TRIALS = 100  # число итераций для оптуны
-N_SPLITS = 3  # cv split
+N_TRIALS = 2  # число итераций для оптуны
+N_SPLITS = 5  # cv split
 METRIC = "f2"
-TARGET_COL = "heart_attack_risk_(binary)"
 N_JOBS = -1
 THRESHOLDS = np.arange(0.1, 0.9, 0.01)
 MIN_PRECISION = 0.9  # гугл говорит, что меньше 0.9 табу для медицины
@@ -746,7 +751,6 @@ def today():
 if __name__ == "__main__":
     MLRUNS_PATH = os.path.join(BASE_DIR, "..", "..", "mlruns")
     MLRUNS_PATH = os.path.abspath(MLRUNS_PATH)
-
     mlflow.set_tracking_uri(f"file://{MLRUNS_PATH}")
 
     # Приведение всех столбцов к числовому типу
@@ -773,10 +777,10 @@ if __name__ == "__main__":
     y_main = TRAIN_DATA[TARGET_COL]
 
     # Сетка параметров для полбора лучших
-    fn_penalty_grid = np.arange(0, 2, 0.5)
-    fp_penalty_grid = np.arange(0, 2, 0.5)
-    fn_stop_grid = range(0, 2)
-    max_fn_soft_grid = range(0, 2)
+    fn_penalty_grid = np.arange(0.5, 0.6, 0.5)
+    fp_penalty_grid = np.arange(1, 1.1, 0.5)
+    fn_stop_grid = range(1, 2)
+    max_fn_soft_grid = range(1, 2)
 
     for fn_penalty, fp_penalty, fn_stop_val, max_fn_soft_val in product(
         fn_penalty_grid, fp_penalty_grid, fn_stop_grid, max_fn_soft_grid

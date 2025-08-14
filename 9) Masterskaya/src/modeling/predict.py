@@ -5,9 +5,10 @@ import sys
 import joblib
 import pandas as pd
 
+# Добавляем корень проекта в PYTHONPATH
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from src.config import DROP_COLS, OHE_COLS
+import src.config as config
 from src.modeling.datapreprocessor import DataPreProcessor
 
 logging.basicConfig(
@@ -27,30 +28,36 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 def main():
     try:
-
+        # Загружаем модель и метаданные
         model_bundle = joblib.load(MODEL)
         model = model_bundle["model"]
         threshold = model_bundle["threshold"]
         selected_features = model_bundle.get("selected_features", None)
 
+        # Загружаем тестовые данные
         df_test = pd.read_csv(TEST_DATA_PATH)
 
-        drop_cols = ["income", "ck-mb", "troponin"]
-        ohe_cols = ["gender"]
-        preprocessor = DataPreProcessor(drop_cols=drop_cols, ohe_cols=ohe_cols)
+        # Убираем таргет из данных на всякий случай
+        if config.TARGET_COL in df_test.columns:
+            df_test = df_test.drop(columns=[config.TARGET_COL])
 
-        # Очистка имён колонок до препроцессинга
+        # Инициализируем препроцессор с параметрами из конфига
+        preprocessor = DataPreProcessor(
+            drop_cols=config.DROP_COLS,
+            ohe_cols=config.OHE_COLS,
+            ord_cols=config.ORD_COLS,
+        )
+
+        # Очистка имён колонок
         df_test = preprocessor.clean_column_names(df_test)
 
         # Загружаем сохранённый pipeline
-        preprocessor.pipeline = joblib.load(
-            os.path.join(preprocessor.models_dir, PREPROCESSOR)
-        )
+        preprocessor.pipeline = joblib.load(PREPROCESSOR)
 
-        # Применяем transform (генерация новых признаков + кодирование + масштабирование)
+        # Применяем transform
         df_test_proc = preprocessor.transform(df_test)
 
-        # После transform оставляем только нужные признаки, если они есть
+        # Фильтруем по отобранным признакам, если они есть
         if selected_features:
             missing_feats = [
                 f for f in selected_features if f not in df_test_proc.columns
@@ -63,12 +70,15 @@ def main():
                 [f for f in selected_features if f in df_test_proc.columns]
             ]
 
+        # Предсказания
         pred_proba = model.predict_proba(df_test_proc)[:, 1]
         predictions = (pred_proba >= threshold).astype(int)
 
+        # Проверяем наличие id
         if "id" not in df_test.columns:
             raise ValueError("В тестовом файле отсутствует колонка 'id'")
 
+        # Сохраняем результат
         result_df = pd.DataFrame({"id": df_test["id"], "prediction": predictions})
         result_df.to_csv(RESULT_FILE, index=False)
         logger.info(f"Результаты предсказаний сохранены в {RESULT_FILE}")

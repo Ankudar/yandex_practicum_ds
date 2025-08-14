@@ -1,3 +1,5 @@
+TARGET_COL = "heart_attack_risk_(binary)"
+
 # Столбцы, которые нужно исключить перед обучением/предсказанием
 DROP_COLS = ["income", "ck-mb", "troponin", "id"]
 
