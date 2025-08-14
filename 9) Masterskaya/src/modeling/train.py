@@ -51,14 +51,15 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
 
 TEST_SIZE = 0.25
 RANDOM_STATE = 40
-N_TRIALS = 200  # число итераций для оптуны
-N_SPLITS = 10  # cv split
+N_TRIALS = 100  # число итераций для оптуны
+N_SPLITS = 3  # cv split
 METRIC = "f2"
 TARGET_COL = "heart_attack_risk_(binary)"
 N_JOBS = -1
 THRESHOLDS = np.arange(0.1, 0.9, 0.01)
-MIN_PRECISION = 0.85  # гугл говорит, что меньше 0.9 табу для медицины
+MIN_PRECISION = 0.9  # гугл говорит, что меньше 0.9 табу для медицины
 MLFLOW_EXPERIMENT = "heat_pred"
+BETA = 2
 
 
 def get_confusion_counts(cm):
@@ -180,7 +181,7 @@ def objective(trial, X_train, y_train):
                 if METRIC == "f1":
                     score_t = f1_score(y_val, y_pred_t, zero_division=0)
                 elif METRIC == "f2":
-                    score_t = fbeta_score(y_val, y_pred_t, beta=1.2, zero_division=0)
+                    score_t = fbeta_score(y_val, y_pred_t, beta=BETA, zero_division=0)
                 elif METRIC == "bal_acc":
                     score_t = balanced_accuracy_score(y_val, y_pred_t)
                 elif METRIC == "accuracy":
@@ -211,7 +212,7 @@ def objective(trial, X_train, y_train):
             recalls.append(recall_score(y_val, y_pred))
             precisions.append(precision_score(y_val, y_pred, zero_division=0))
             f1s.append(f1_score(y_val, y_pred, zero_division=0))
-            f2s.append(fbeta_score(y_val, y_pred, beta=2, zero_division=0))
+            f2s.append(fbeta_score(y_val, y_pred, beta=BETA, zero_division=0))
             bal_acc.append(balanced_accuracy_score(y_val, y_pred_t))
             accuracies.append(accuracy_score(y_val, y_pred))
             roc_auc.append(roc_auc_score(y_val, y_proba))
@@ -334,7 +335,7 @@ def run_optuna_experiment(
             "recall": recall,
             "roc_auc": roc_auc_score(y_test, y_pred_proba),
             "f1": f1_score(y_test, y_pred),
-            "f2": fbeta_score(y_test, y_pred, beta=2, zero_division=0),
+            "f2": fbeta_score(y_test, y_pred, beta=BETA, zero_division=0),
             "bal_acc": balanced_accuracy_score(y_test, y_pred),
         }
 
@@ -414,7 +415,7 @@ def run_optuna_experiment(
             "recall": recall_train,
             "roc_auc": roc_auc_score(y_train, y_pred_proba_train),
             "f1": f1_score(y_train, y_pred_train),
-            "f2": fbeta_score(y_train, y_pred_train, beta=2, zero_division=0),
+            "f2": fbeta_score(y_train, y_pred_train, beta=BETA, zero_division=0),
             "bal_acc": balanced_accuracy_score(y_train, y_pred_train),
         }
 
@@ -475,6 +476,7 @@ def log_with_mlflow(
             mlflow.log_param("random_state", RANDOM_STATE)
             mlflow.log_param("n_trials", n_trials)
             mlflow.log_param("n_splits", N_SPLITS)
+            mlflow.log_param("beta", BETA)
             mlflow.log_param("model_type", "XGBClassifier")
             mlflow.log_param("threshold", round(best_threshold, 5))
             mlflow.log_param(
@@ -555,18 +557,21 @@ def log_with_mlflow(
             os.remove("shap_dot_plot.png")
 
             # Threshold vs metrics
-            f1s, precisions, recalls = [], [], []
+            f2s, precisions, recalls = [], [], []
             for t in THRESHOLDS:
                 y_pred_temp = (y_pred_proba >= t).astype(int)
-                p, r, f1, _ = precision_recall_fscore_support(
+                p, r, _, _ = precision_recall_fscore_support(
                     y_test, y_pred_temp, average="binary", zero_division=0
                 )
-                f1s.append(f1)
+                f2 = fbeta_score(
+                    y_test, y_pred_temp, beta=BETA, average="binary", zero_division=0
+                )
+                f2s.append(f2)
                 precisions.append(p)
                 recalls.append(r)
 
             plt.figure(figsize=(8, 6))
-            plt.plot(THRESHOLDS, f1s, label="F1")
+            plt.plot(THRESHOLDS, f2s, label="F2")
             plt.plot(THRESHOLDS, precisions, label="Precision")
             plt.plot(THRESHOLDS, recalls, label="Recall")
             plt.axvline(
@@ -577,7 +582,7 @@ def log_with_mlflow(
             )
             plt.xlabel("Threshold")
             plt.ylabel("Score")
-            plt.title("Threshold vs F1 / Precision / Recall")
+            plt.title("Threshold vs F2 / Precision / Recall")
             plt.legend()
             plt.grid(True)
             plt.tight_layout()
@@ -705,6 +710,7 @@ def log_with_mlflow(
                 "MIN_PRECISION": MIN_PRECISION,
                 "FN_STOP": FN_STOP,
                 "MAX_FN_SOFT": MAX_FN_SOFT,
+                "BETA": BETA,
             }
 
             with open("experiment_config.json", "w") as f:

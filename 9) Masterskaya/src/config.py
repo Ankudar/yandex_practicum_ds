@@ -1,5 +1,5 @@
 # Столбцы, которые нужно исключить перед обучением/предсказанием
-DROP_COLS = ["income", "ck-mb", "troponin", "diabetes"]
+DROP_COLS = ["income", "ck-mb", "troponin", "id"]
 
 # Категориальные признаки для One-Hot Encoding
 OHE_COLS = ["gender"]

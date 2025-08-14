@@ -56,6 +56,7 @@ class DataPreProcessor:
 
         required_cols = [
             "systolic_blood_pressure",
+            "diastolic_blood_pressure",
             "cholesterol",
             "triglycerides",
             "obesity",
@@ -69,10 +70,24 @@ class DataPreProcessor:
         if missing:
             raise ValueError(f"Отсутствуют признаки: {missing}")
 
+        # Новые фичи
+        df["pulse_pressure"] = (
+            df["systolic_blood_pressure"] - df["diastolic_blood_pressure"]
+        )
+        df["bp_ratio"] = df["systolic_blood_pressure"] / (
+            df["diastolic_blood_pressure"] + 1e-6
+        )
         df["chol_trig_ratio"] = df["cholesterol"] / (df["triglycerides"] + 1e-6)
         df["obesity_exercise_interaction"] = (
             df["obesity"] * df["exercise_hours_per_week"]
         )
+        df["age_smoking_interaction"] = df["age"] * df["smoking"]
+        df["stress_sedentary_ratio"] = df["stress_level"] / (
+            df["sedentary_hours_per_day"] + 1
+        )
+        df["bp_mean"] = (
+            df["systolic_blood_pressure"] + df["diastolic_blood_pressure"]
+        ) / 2
 
         return df
 
