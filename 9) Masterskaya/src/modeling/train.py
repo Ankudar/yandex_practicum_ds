@@ -52,12 +52,12 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
 TEST_SIZE = 0.25
 RANDOM_STATE = 40
 N_TRIALS = 200  # число итераций для оптуны
-N_SPLITS = 10  # cv split
+N_SPLITS = 5  # cv split
 METRIC = "f2"
 TARGET_COL = "heart_attack_risk_(binary)"
 N_JOBS = -1
 THRESHOLDS = np.arange(0.1, 0.9, 0.01)
-MIN_PRECISION = 0.8  # гугл говорит, что меньше 0.9 табу для медицины
+MIN_PRECISION = 0.85  # гугл говорит, что меньше 0.9 табу для медицины
 MLFLOW_EXPERIMENT = "heat_pred"
 
 
@@ -476,40 +476,40 @@ def log_with_mlflow(
             mlflow.log_param("n_trials", n_trials)
             mlflow.log_param("n_splits", N_SPLITS)
             mlflow.log_param("model_type", "XGBClassifier")
-            mlflow.log_param("threshold", round(best_threshold, 4))
+            mlflow.log_param("threshold", round(best_threshold, 5))
             mlflow.log_param(
                 "cv_best_threshold",
-                round(study.best_trial.user_attrs["best_threshold"], 4),
+                round(study.best_trial.user_attrs["best_threshold"], 5),
             )
 
             mlflow.log_param("opt_metric", f"{metric}")
             mlflow.log_metric("fn_test", fn)
             mlflow.log_metric("fp_test", fp)
 
-            mlflow.log_metric("f1_train", round(final_metrics_train["f1"], 3))
-            mlflow.log_metric("f1_test", round(final_metrics["f1"], 3))
+            mlflow.log_metric("f1_train", round(final_metrics_train["f1"], 5))
+            mlflow.log_metric("f1_test", round(final_metrics["f1"], 5))
 
-            mlflow.log_metric("f2_train", round(final_metrics_train["f2"], 3))
-            mlflow.log_metric("f2_test", round(final_metrics["f2"], 3))
+            mlflow.log_metric("f2_train", round(final_metrics_train["f2"], 5))
+            mlflow.log_metric("f2_test", round(final_metrics["f2"], 5))
 
-            mlflow.log_metric("bal_acc_train", round(final_metrics_train["bal_acc"], 3))
-            mlflow.log_metric("bal_acc_test", round(final_metrics["bal_acc"], 3))
-
-            mlflow.log_metric(
-                "accuracy_train", round(final_metrics_train["accuracy"], 3)
-            )
-            mlflow.log_metric("accuracy_test", round(final_metrics["accuracy"], 3))
-
-            mlflow.log_metric("recall_train", round(final_metrics_train["recall"], 3))
-            mlflow.log_metric("recall_test", round(final_metrics["recall"], 3))
+            mlflow.log_metric("bal_acc_train", round(final_metrics_train["bal_acc"], 5))
+            mlflow.log_metric("bal_acc_test", round(final_metrics["bal_acc"], 5))
 
             mlflow.log_metric(
-                "precision_train", round(final_metrics_train["precision"], 3)
+                "accuracy_train", round(final_metrics_train["accuracy"], 5)
             )
-            mlflow.log_metric("precision_test", round(final_metrics["precision"], 3))
+            mlflow.log_metric("accuracy_test", round(final_metrics["accuracy"], 5))
 
-            mlflow.log_metric("roc_auc_train", round(final_metrics_train["roc_auc"], 3))
-            mlflow.log_metric("roc_auc_test", round(final_metrics["roc_auc"], 3))
+            mlflow.log_metric("recall_train", round(final_metrics_train["recall"], 5))
+            mlflow.log_metric("recall_test", round(final_metrics["recall"], 5))
+
+            mlflow.log_metric(
+                "precision_train", round(final_metrics_train["precision"], 5)
+            )
+            mlflow.log_metric("precision_test", round(final_metrics["precision"], 5))
+
+            mlflow.log_metric("roc_auc_train", round(final_metrics_train["roc_auc"], 5))
+            mlflow.log_metric("roc_auc_test", round(final_metrics["roc_auc"], 5))
 
             mlflow.log_artifact(model_output_path)
             mlflow.sklearn.log_model(final_model, name="final_model", input_example=input_example)  # type: ignore
@@ -769,8 +769,8 @@ if __name__ == "__main__":
     # Сетка параметров для полбора лучших
     fn_penalty_grid = np.arange(0, 2, 0.5)
     fp_penalty_grid = np.arange(0, 2, 0.5)
-    fn_stop_grid = range(0, 3)
-    max_fn_soft_grid = range(0, 3)
+    fn_stop_grid = range(0, 1)
+    max_fn_soft_grid = range(0, 1)
 
     for fn_penalty, fp_penalty, fn_stop_val, max_fn_soft_val in product(
         fn_penalty_grid, fp_penalty_grid, fn_stop_grid, max_fn_soft_grid
