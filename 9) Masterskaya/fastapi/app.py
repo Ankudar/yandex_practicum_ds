@@ -25,11 +25,11 @@ RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 MODELS_DIR = Path("../models")
 model_files = sorted(
-    MODELS_DIR.glob("heart_pred_*.pkl"), key=os.path.getmtime, reverse=True
+    MODELS_DIR.glob("heart_pred.pkl"), key=os.path.getmtime, reverse=True
 )
 if not model_files:
     raise FileNotFoundError(
-        "Не найдено ни одной модели 'heart_pred_*.pkl' в папке models"
+        "Не найдено ни одной модели 'heart_pred.pkl' в папке models"
     )
 
 MODEL = model_files[0]

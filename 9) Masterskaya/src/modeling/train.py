@@ -57,7 +57,7 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
 
 TEST_SIZE = 0.25
 RANDOM_STATE = 40
-N_TRIALS = 2  # число итераций для оптуны
+N_TRIALS = 1000  # число итераций для оптуны
 N_SPLITS = 5  # cv split
 METRIC = "f2"
 N_JOBS = -1
@@ -811,6 +811,6 @@ if __name__ == "__main__":
             metric=METRIC,
             n_trials=N_TRIALS,
             experiment_name=f"{MLFLOW_EXPERIMENT}",
-            model_output_path=f"{MODELS_DIR}/heart_pred_{today()}.pkl",
+            model_output_path=f"{MODELS_DIR}/heart_pred.pkl",
             current_time=today(),
         )

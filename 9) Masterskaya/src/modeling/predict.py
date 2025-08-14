@@ -22,12 +22,12 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
 
 # Поиск самой свежей модели по маске heart_pred_*.pkl
 model_files = sorted(
-    glob.glob(os.path.join(MODELS_DIR, "heart_pred_*.pkl")),
+    glob.glob(os.path.join(MODELS_DIR, "heart_pred.pkl")),
     key=os.path.getmtime,
     reverse=True,
 )
 if not model_files:
-    raise FileNotFoundError("Не найдено ни одной модели 'heart_pred_*.pkl'")
+    raise FileNotFoundError("Не найдено ни одной модели 'heart_pred.pkl'")
 MODEL = model_files[0]
 
 # Препроцессор без изменений
