@@ -2,33 +2,32 @@ import glob
 import logging
 import os
 import sys
+from pathlib import Path
 
 import joblib
 import pandas as pd
 
-# Добавляем корень проекта в PYTHONPATH
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # ../../.. от predict.py
+SRC_DIR = PROJECT_ROOT / "src"
+sys.path.insert(0, str(SRC_DIR))  # добавляем src в PYTHONPATH
 
-import src.config as config
-from src.modeling.datapreprocessor import DataPreProcessor
+import config
+from modeling.datapreprocessor import DataPreProcessor
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
+BASE_DIR = Path(__file__).resolve().parent  # папка src/modeling
+MODELS_DIR = PROJECT_ROOT / "models"  # ../../models относительно predict.py
 
-# Поиск самой свежей модели по маске heart_pred_*.pkl
-model_files = sorted(
-    glob.glob(os.path.join(MODELS_DIR, "heart_pred.pkl")),
-    key=os.path.getmtime,
-    reverse=True,
-)
-if not model_files:
-    raise FileNotFoundError("Не найдено ни одной модели 'heart_pred.pkl'")
-MODEL = model_files[0]
+model_path = MODELS_DIR / "heart_pred.pkl"
+
+if not model_path.exists():
+    raise FileNotFoundError(f"Не найден файл модели: {model_path}")
+
+MODEL = model_path
 
 # Препроцессор без изменений
 PREPROCESSOR = os.path.join(MODELS_DIR, "train_preprocessor.pkl")

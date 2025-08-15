@@ -5,10 +5,10 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
+from config import TARGET_COL
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, RobustScaler
-from src.config import TARGET_COL
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent  # fastapi/.. -> 9) Masterskaya
 sys.path.append(str(PROJECT_ROOT / "src"))  # Добавляем src в путь

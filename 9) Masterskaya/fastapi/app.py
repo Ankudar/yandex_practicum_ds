@@ -1,5 +1,3 @@
-import glob
-import os
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -10,29 +8,38 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent  # fastapi/.. -> 9) Masterskaya
-sys.path.append(str(PROJECT_ROOT))  # Добавляем src в путь
+# ---------------------------------------------------------
+# Настройка путей
+# fastapi/app.py -> PROJECT_ROOT = 9) Masterskaya
+# src/ нужно добавить в sys.path
+# ---------------------------------------------------------
+PROJECT_ROOT = Path(__file__).resolve().parent.parent  # ../.. от app.py
+SRC_DIR = PROJECT_ROOT / "src"
+sys.path.insert(0, str(SRC_DIR))  # добавляем src в PYTHONPATH
 
-from src.config import DROP_COLS, OHE_COLS, ORD_COLS, TARGET_COL  # type: ignore
-from src.modeling.datapreprocessor import DataPreProcessor  # type: ignore
+# ---------------------------------------------------------
+# Импорты после добавления src
+# ---------------------------------------------------------
+from config import DROP_COLS, OHE_COLS, ORD_COLS  # type: ignore
+from modeling.datapreprocessor import DataPreProcessor  # type: ignore
 
+# ---------------------------------------------------------
+# FastAPI
+# ---------------------------------------------------------
 app = FastAPI()
 
+PREPROCESSOR_PATH = PROJECT_ROOT / "models" / "train_preprocessor.pkl"
 
-PREPROCESSOR_PATH = "../models/train_preprocessor.pkl"
-RESULTS_DIR = Path("../data/results")
+RESULTS_DIR = PROJECT_ROOT / "data" / "results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-MODELS_DIR = Path("../models")
-model_files = sorted(
-    MODELS_DIR.glob("heart_pred.pkl"), key=os.path.getmtime, reverse=True
-)
-if not model_files:
-    raise FileNotFoundError(
-        "Не найдено ни одной модели 'heart_pred.pkl' в папке models"
-    )
+MODELS_DIR = PROJECT_ROOT / "models"
+model_path = MODELS_DIR / "heart_pred.pkl"
 
-MODEL = model_files[0]
+if not model_path.exists():
+    raise FileNotFoundError(f"Не найден файл модели: {model_path}")
+
+MODEL = model_path
 model_bundle = joblib.load(MODEL)
 model = model_bundle["model"]
 threshold = model_bundle["threshold"]
