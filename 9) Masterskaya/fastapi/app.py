@@ -99,8 +99,8 @@ async def predict(file: UploadFile = File(...)):
 
         # Сохраняем CSV и JSON
         orig_name = Path(file.filename).stem  # type: ignore
-        csv_path = RESULTS_DIR / f"{orig_name}_pred.csv"
-        json_path = RESULTS_DIR / f"{orig_name}_pred.json"
+        csv_path = RESULTS_DIR / f"{orig_name}_pred_with_proba.csv"
+        json_path = RESULTS_DIR / f"{orig_name}_pred_with_proba.json"
 
         result_df.to_csv(csv_path, index=False)
         result_df.to_json(json_path, orient="records", force_ascii=False)

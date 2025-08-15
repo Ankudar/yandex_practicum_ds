@@ -57,7 +57,7 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
 
 TEST_SIZE = 0.25
 RANDOM_STATE = 40
-N_TRIALS = 1000  # число итераций для оптуны
+N_TRIALS = 200  # число итераций для оптуны
 N_SPLITS = 5  # cv split
 METRIC = "f2"
 N_JOBS = -1
@@ -561,6 +561,38 @@ def log_with_mlflow(
             mlflow.log_artifact("shap_dot_plot.png")
             os.remove("shap_dot_plot.png")
 
+            # Берем среднее абсолютное SHAP по каждому признаку
+            shap_mean = np.mean(shap_values.values, axis=0)  # среднее по всем примерам
+            shap_sign = np.sign(np.mean(shap_values.values, axis=0))  # знак влияния
+
+            # Создаем DataFrame для сортировки
+            shap_df = pd.DataFrame(
+                {
+                    "feature": X_test.columns,
+                    "shap_mean": shap_mean * shap_sign,  # учитываем направление
+                }
+            )
+
+            # Сортируем по абсолютному влиянию
+            shap_df = shap_df.reindex(
+                shap_df.shap_mean.abs().sort_values(ascending=False).index
+            )
+
+            # Цвета: положительное → красное, отрицательное → синее
+            colors = ["red" if x > 0 else "blue" for x in shap_df.shap_mean]
+
+            plt.figure(figsize=(8, 6))
+            plt.barh(shap_df["feature"], shap_df["shap_mean"], color=colors)
+            plt.xlabel("SHAP значение (влияние на риск)")
+            plt.ylabel("Признак")
+            plt.title("ТОП факторов по влиянию")
+            plt.gca().invert_yaxis()  # чтобы самый сильный сверху
+            plt.tight_layout()
+            plt.savefig("shap_bar_plot_colored.png")
+            plt.close()
+            mlflow.log_artifact("shap_bar_plot_colored.png")
+            os.remove("shap_bar_plot_colored.png")
+
             # Threshold vs metrics
             f2s, precisions, recalls = [], [], []
             for t in THRESHOLDS:
@@ -777,10 +809,10 @@ if __name__ == "__main__":
     y_main = TRAIN_DATA[TARGET_COL]
 
     # Сетка параметров для полбора лучших
-    fn_penalty_grid = np.arange(0.5, 0.6, 0.5)
-    fp_penalty_grid = np.arange(1, 1.1, 0.5)
-    fn_stop_grid = range(1, 2)
-    max_fn_soft_grid = range(1, 2)
+    fn_penalty_grid = np.arange(0, 1, 0.5)
+    fp_penalty_grid = np.arange(0, 1, 0.5)
+    fn_stop_grid = range(0, 2)
+    max_fn_soft_grid = range(0, 2)
 
     for fn_penalty, fp_penalty, fn_stop_val, max_fn_soft_val in product(
         fn_penalty_grid, fp_penalty_grid, fn_stop_grid, max_fn_soft_grid
