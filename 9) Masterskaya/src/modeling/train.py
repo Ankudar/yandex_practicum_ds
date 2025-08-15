@@ -561,37 +561,40 @@ def log_with_mlflow(
             mlflow.log_artifact("shap_dot_plot.png")
             os.remove("shap_dot_plot.png")
 
-            # Берем среднее абсолютное SHAP по каждому признаку
-            shap_mean = np.mean(shap_values.values, axis=0)  # среднее по всем примерам
-            shap_sign = np.sign(np.mean(shap_values.values, axis=0))  # знак влияния
+            # ------------------- Подготовка данных -------------------
+            shap_mean = np.mean(shap_values.values, axis=0)
+            shap_sign = np.sign(shap_mean)
 
-            # Создаем DataFrame для сортировки
             shap_df = pd.DataFrame(
                 {
                     "feature": X_test.columns,
-                    "shap_mean": shap_mean * shap_sign,  # учитываем направление
+                    "shap_mean": shap_mean,
+                    "shap_sign": shap_sign,
                 }
             )
 
-            # Сортируем по абсолютному влиянию
+            # Сортируем признаки по абсолютному влиянию
             shap_df = shap_df.reindex(
                 shap_df.shap_mean.abs().sort_values(ascending=False).index
             )
 
-            # Цвета: положительное → красное, отрицательное → синее
+            # Цвета по направлению влияния
             colors = ["red" if x > 0 else "blue" for x in shap_df.shap_mean]
 
-            plt.figure(figsize=(8, 6))
+            # ------------------- Построение графика -------------------
+            plt.figure(figsize=(10, 8))
             plt.barh(shap_df["feature"], shap_df["shap_mean"], color=colors)
-            plt.xlabel("SHAP значение (влияние на риск)")
+            plt.xlabel("SHAP значение")
             plt.ylabel("Признак")
-            plt.title("ТОП факторов по влиянию")
-            plt.gca().invert_yaxis()  # чтобы самый сильный сверху
+            plt.title(
+                "Влияние признаков на предсказание (красное → положительный, синее → отрицательный)"
+            )
+            plt.gca().invert_yaxis()  # самый сильный сверху
             plt.tight_layout()
-            plt.savefig("shap_bar_plot_colored.png")
+            plt.savefig("shap_combined.png")
+            mlflow.log_artifact("shap_combined.png")
             plt.close()
-            mlflow.log_artifact("shap_bar_plot_colored.png")
-            os.remove("shap_bar_plot_colored.png")
+            os.remove("shap_combined.png")
 
             # Threshold vs metrics
             f2s, precisions, recalls = [], [], []
@@ -809,8 +812,8 @@ if __name__ == "__main__":
     y_main = TRAIN_DATA[TARGET_COL]
 
     # Сетка параметров для полбора лучших
-    fn_penalty_grid = np.arange(0, 1, 0.5)
-    fp_penalty_grid = np.arange(0, 1, 0.5)
+    fn_penalty_grid = np.arange(0, 1.5, 0.5)
+    fp_penalty_grid = np.arange(0, 1.5, 0.5)
     fn_stop_grid = range(0, 2)
     max_fn_soft_grid = range(0, 2)
 
