@@ -17,31 +17,33 @@
     #filter-panel { margin-top: 15px; clear: both; display: none; text-align: left; }
     #controls { margin-bottom: 15px; clear: both; }
     #download-links { margin-top: 10px; display: none; text-align: left; }
+    #note { margin-top: 10px; color: #b33; font-weight: bold; }
   </style>
 </head>
 <body>
   <h2>Риск возникновения инфаркта</h2>
 
   <div id="controls">
-    <input type="file" id="fileInput">
-    <p><button onclick="uploadFile()">Отправить CSV</button>
+    <input type="file" id="fileInput" accept=".csv">
+    <button id="uploadBtn" type="button">Отправить CSV</button>
   </div>
 
   <div id="summary"></div>
+  <div id="note"></div>
 
   <div id="chart-container">
     <canvas id="riskChart"></canvas>
   </div>
 
   <div id="filter-panel">
-    <label>Столбец: 
+    <label>Столбец:
       <select id="filter-column">
         <option value="id">ID</option>
         <option value="prediction">Prediction</option>
         <option value="probability">Probability</option>
       </select>
     </label>
-    <label>Условие: 
+    <label>Условие:
       <select id="filter-condition">
         <option value="contains">Содержит</option>
         <option value="equals">Равно</option>
@@ -50,11 +52,11 @@
       </select>
     </label>
     <label>Значение: <input type="text" id="filter-value"></label>
-    <button onclick="applyFilter()">Применить фильтр</button>
-    <button onclick="resetFilter()">Сбросить фильтры</button>
+    <button id="applyFilterBtn" type="button">Применить фильтр</button>
+    <button id="resetFilterBtn" type="button">Сбросить фильтры</button>
   </div>
 
-  <div id="download-links">
+  <div id="download-links" style="text-align: left; margin-top: 10px;">
     <a id="download-csv" href="" target="_blank">Скачать результат - CSV</a> |
     <a id="download-json" href="" target="_blank">Скачать результат - JSON</a>
   </div>
@@ -72,56 +74,154 @@
 
   <script>
     let fullData = [];
+    let displayedData = [];
     let currentSort = { column: null, ascending: true };
     let riskChartInstance = null;
+    const uploadBtn = document.getElementById('uploadBtn');
+    const fileInput = document.getElementById('fileInput');
+
+    function setSummary(text) {
+      document.getElementById("summary").innerText = text;
+    }
+    function setNote(text) {
+      document.getElementById("note").innerText = text;
+    }
+
+    function resetUIElements() {
+      // hide table, filters and downloads
+      document.getElementById("predictions-table").style.display = "none";
+      document.getElementById("filter-panel").style.display = "none";
+      document.getElementById("download-links").style.display = "none";
+      // clear table body
+      document.querySelector("#predictions-table tbody").innerHTML = "";
+      // clear data
+      fullData = [];
+      displayedData = [];
+      currentSort = { column: null, ascending: true };
+      // destroy chart if exists
+      if (riskChartInstance) {
+        try { riskChartInstance.destroy(); } catch (e) {}
+        riskChartInstance = null;
+      }
+      // reset download links
+      document.getElementById("download-csv").href = "";
+      document.getElementById("download-json").href = "";
+      // clear filters
+      document.getElementById("filter-value").value = "";
+    }
 
     async function uploadFile() {
-      const fileInput = document.getElementById("fileInput");
       if (!fileInput.files.length) return alert("Выберите CSV файл");
+      uploadBtn.disabled = true;
+      setSummary("Обработка файла...");
+      setNote("");
+      // reset UI for new upload
+      resetUIElements();
 
       const formData = new FormData();
       formData.append("file", fileInput.files[0]);
 
-      const response = await fetch("/predict", { method: "POST", body: formData });
-      const data = await response.json();
+      let res;
+      try {
+        res = await fetch("/predict", { method: "POST", body: formData, cache: "no-store" });
+      } catch (err) {
+        setSummary("");
+        setNote("Ошибка соединения.");
+        uploadBtn.disabled = false;
+        return;
+      }
 
-      if (data.status !== "success") return alert("Ошибка: " + data.error);
+      if (!res.ok) {
+        // try to read json error
+        let errText = `Сервер вернул ${res.status}`;
+        try {
+          const errJson = await res.json();
+          errText = errJson.error || JSON.stringify(errJson);
+        } catch (_) {}
+        setSummary("");
+        setNote("Ошибка: " + errText);
+        uploadBtn.disabled = false;
+        return;
+      }
 
-      document.getElementById("summary").innerText =
-        `Всего строк: ${data.summary.total_rows}, Positive: ${data.summary.positive}, Negative: ${data.summary.negative}`;
+      let data;
+      try {
+        data = await res.json();
+      } catch (err) {
+        setSummary("");
+        setNote("Неверный ответ сервера.");
+        uploadBtn.disabled = false;
+        return;
+      }
 
-      fullData = Object.entries(data.predictions).map(([id, pred]) => ({
-        id,
-        prediction: pred,
-        probability: data.probabilities[id]
-      }));
+      if (data.status !== "success") {
+        setSummary("");
+        setNote("Ошибка: " + (data.error || JSON.stringify(data)));
+        uploadBtn.disabled = false;
+        return;
+      }
+
+      const n = Number(data.summary?.total_rows ?? 0);
+      const positive = Number(data.summary?.positive ?? 0);
+      const negative = Number(data.summary?.negative ?? 0);
+
+      // update download links even if values empty (cache-busted)
+      if (data.download_csv) {
+        document.getElementById("download-csv").href = data.download_csv + "?t=" + Date.now();
+      }
+      if (data.download_json) {
+        document.getElementById("download-json").href = data.download_json + "?t=" + Date.now();
+      }
+      document.getElementById("download-links").style.display = "block";
+
+      // If file is large (>1000) — show only summary + download links and a note. Clear table and chart.
+      if (!data.predictions || n > 1000) {
+        setSummary(`Всего строк: ${n}, Positive: ${positive}, Negative: ${negative}.`);
+        setNote(data.preview_note || "Файл большой. Скачайте результат по ссылке ниже.");
+        document.getElementById("predictions-table").style.display = "none";
+        document.getElementById("filter-panel").style.display = "none";
+        uploadBtn.disabled = false;
+        return;
+      }
+
+      // small file: render table, chart, filters
+      setSummary(`Всего строк: ${n}, Positive: ${positive}, Negative: ${negative}`);
+      setNote("");
+
+      // build fullData from returned dictionaries (compatible with backend)
+      try {
+        fullData = Object.entries(data.predictions).map(([id, pred]) => ({
+          id,
+          prediction: pred,
+          probability: parseFloat(data.probabilities?.[id] ?? 0)
+        }));
+      } catch (err) {
+        fullData = [];
+      }
+
+      displayedData = [...fullData]; // start displayed as full data
 
       document.getElementById("predictions-table").style.display = "table";
       document.getElementById("filter-panel").style.display = "block";
-      document.getElementById("download-links").style.display = "block";
 
-      renderTable(fullData);
+      renderTable(displayedData);
 
-      document.getElementById("download-csv").href = data.download_csv;
-      document.getElementById("download-json").href = data.download_json;
-
+      // render chart
       const ctx = document.getElementById('riskChart').getContext('2d');
-      if (riskChartInstance) riskChartInstance.destroy();
+      if (riskChartInstance) { try { riskChartInstance.destroy(); } catch(e){} }
       riskChartInstance = new Chart(ctx, {
         type: 'pie',
         data: {
           labels: ['Низкий риск', 'Высокий риск'],
-          datasets: [{
-            data: [data.summary.negative, data.summary.positive],
-            backgroundColor: ['#28a745','#dc3545']
-          }]
+          datasets: [{ data: [negative, positive] }]
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: true, position: 'bottom' } }
-        }
+        options: { responsive: true, maintainAspectRatio: false }
       });
+
+      // enable button again
+      uploadBtn.disabled = false;
+      // keep fileInput value so user sees filename; if you want to clear it uncomment next line
+      // fileInput.value = "";
     }
 
     function renderTable(data) {
@@ -129,7 +229,9 @@
       tbody.innerHTML = "";
       data.forEach(row => {
         const color = row.prediction == 1 ? "#ffcccc" : "#ccffcc";
-        tbody.innerHTML += `<tr style="background-color:${color}"><td>${row.id}</td><td>${row.prediction}</td><td>${row.probability.toFixed(2)}</td></tr>`;
+        const prob = (typeof row.probability === 'number' && !isNaN(row.probability)) ? row.probability.toFixed(2) : (row.probability ?? '');
+        const safeId = String(row.id ?? '');
+        tbody.innerHTML += `<tr style="background-color:${color}"><td>${safeId}</td><td>${row.prediction}</td><td>${prob}</td></tr>`;
       });
     }
 
@@ -137,40 +239,58 @@
       const col = document.getElementById("filter-column").value;
       const cond = document.getElementById("filter-condition").value;
       const val = document.getElementById("filter-value").value;
-
-      const filtered = fullData.filter(row => {
+      if (!fullData.length) return;
+      displayedData = fullData.filter(row => {
         const cell = row[col];
         if (cond === "contains") return String(cell).includes(val);
         if (cond === "equals") return String(cell) === val;
-        if (cond === "gt") return parseFloat(cell) > parseFloat(val);
-        if (cond === "lt") return parseFloat(cell) < parseFloat(val);
+        if (cond === "gt") return !isNaN(parseFloat(cell)) && parseFloat(cell) > parseFloat(val);
+        if (cond === "lt") return !isNaN(parseFloat(cell)) && parseFloat(cell) < parseFloat(val);
         return true;
       });
-
-      renderTable(filtered);
+      // reset sort when filtering
+      currentSort = { column: null, ascending: true };
+      renderTable(displayedData);
     }
 
     function resetFilter() {
       document.getElementById("filter-value").value = "";
-      renderTable(fullData);
+      displayedData = [...fullData];
+      currentSort = { column: null, ascending: true };
+      renderTable(displayedData);
     }
 
     function sortTable(column) {
       const ascending = (currentSort.column === column) ? !currentSort.ascending : true;
       currentSort = { column, ascending };
 
-      fullData.sort((a, b) => {
+      const arr = displayedData.length ? displayedData : fullData;
+      arr.sort((a, b) => {
         const valA = a[column];
         const valB = b[column];
-        if (!isNaN(valA) && !isNaN(valB)) {
-          return ascending ? valA - valB : valB - valA;
+        const numA = parseFloat(valA);
+        const numB = parseFloat(valB);
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return ascending ? numA - numB : numB - numA;
         } else {
           return ascending ? String(valA).localeCompare(String(valB)) : String(valB).localeCompare(String(valA));
         }
       });
 
-      renderTable(fullData);
+      // if sorting was done on fullData and displayedData is empty, sync displayedData
+      if (!displayedData.length) displayedData = [...arr];
+      renderTable(arr);
     }
+
+    // event listeners
+    uploadBtn.addEventListener('click', uploadFile);
+    document.getElementById('applyFilterBtn').addEventListener('click', applyFilter);
+    document.getElementById('resetFilterBtn').addEventListener('click', resetFilter);
+
+    // allow Enter key in filter value to apply filter
+    document.getElementById('filter-value').addEventListener('keydown', function(e){
+      if (e.key === 'Enter') { applyFilter(); }
+    });
   </script>
 </body>
 </html>

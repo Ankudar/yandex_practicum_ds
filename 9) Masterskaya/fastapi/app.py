@@ -1,3 +1,4 @@
+import os
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -68,28 +69,37 @@ async def predict(file: UploadFile = File(...)):
                 status_code=400, content={"error": "CSV должен содержать колонку 'id'"}
             )
 
-        # прогоняем через препроцессор
+        # --- препроцессинг ---
         df_processed = preprocessor.transform(df)
+        alerts = []
+
         if selected_features:
             processed_cols = set(df_processed.columns) - {"id"}
             expected_cols = set(selected_features)
+
+            extra_feats = sorted(processed_cols - expected_cols)
+            if extra_feats:
+                alerts.append(
+                    f"⚠️ В файле есть лишние признаки: {extra_feats}. Они будут проигнорированы."
+                )
+                df_processed = df_processed.drop(columns=extra_feats, errors="ignore")
+                processed_cols = set(df_processed.columns) - {"id"}
 
             missing_feats = sorted(expected_cols - processed_cols)
             if missing_feats:
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error": "Не хватает признаков после препроцессинга",
+                        "error": "❌ Не хватает признаков после препроцессинга",
                         "missing": missing_feats,
                     },
                 )
 
-            # удаляем все лишние столбцы
-            X = df_processed[selected_features]
+            X = df_processed.loc[:, selected_features]
         else:
             X = df_processed.drop(columns=["id"], errors="ignore")
 
-        # предсказание
+        # --- предсказание ---
         proba = model.predict_proba(X)[:, 1]
         preds = (proba >= threshold).astype(int)
 
@@ -97,36 +107,51 @@ async def predict(file: UploadFile = File(...)):
             {"id": df["id"], "prediction": preds, "probability": proba}
         )
 
-        # формируем JSON
-        result_json = {
-            str(i): int(p) for i, p in zip(result_df["id"], result_df["prediction"])
-        }
-        prob_json = {
-            str(i): float(pr)
-            for i, pr in zip(result_df["id"], result_df["probability"])
-        }
+        # словари для фронта (только если строк ≤1000)
+        n_rows = len(result_df)
+        if n_rows <= 1000:
+            result_json = {
+                str(i): int(p) for i, p in zip(result_df["id"], result_df["prediction"])
+            }
+            prob_json = {
+                str(i): float(pr)
+                for i, pr in zip(result_df["id"], result_df["probability"])
+            }
+        else:
+            result_json = None
+            prob_json = None
 
-        # сохраняем
+        # --- сохраняем файлы ---
         orig_name = Path(file.filename).stem  # type: ignore
         csv_path = RESULTS_DIR / f"{orig_name}_pred_with_proba.csv"
         json_path = RESULTS_DIR / f"{orig_name}_pred_with_proba.json"
-
         result_df.to_csv(csv_path, index=False)
         result_df.to_json(json_path, orient="records", force_ascii=False)
 
-        return {
+        # --- ответ ---
+        resp = {
             "status": "success",
-            "message": "Файл с предсказаниями сохранён.",
-            "download_csv": f"http://localhost:8000/results/{csv_path.name}",
-            "download_json": f"http://localhost:8000/results/{json_path.name}",
+            "alerts": alerts or None,
             "summary": {
-                "total_rows": len(result_df),
+                "total_rows": n_rows,
                 "positive": int(preds.sum()),
                 "negative": int((preds == 0).sum()),
             },
-            "predictions": result_json,
-            "probabilities": prob_json,
+            "download_csv": f"/results/{csv_path.name}",
+            "download_json": f"/results/{json_path.name}",
         }
+
+        # только если строк мало — добавляем таблицу
+        if n_rows <= 1000:
+            resp["predictions"] = result_json
+            resp["probabilities"] = prob_json
+        else:
+            resp["preview_note"] = (
+                "⚠️ Файл содержит более 1000 строк. "
+                "Полный результат можно скачать по ссылкам."
+            )
+
+        return resp
 
     except Exception as e:
         return JSONResponse(
