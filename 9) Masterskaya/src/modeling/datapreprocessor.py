@@ -4,11 +4,17 @@ import sys
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
 from config import TARGET_COL
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, RobustScaler
+from sklearn.preprocessing import (
+    MinMaxScaler,
+    OneHotEncoder,
+    OrdinalEncoder,
+    RobustScaler,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent  # fastapi/.. -> 9) Masterskaya
 sys.path.append(str(PROJECT_ROOT / "src"))  # Добавляем src в путь
@@ -109,7 +115,6 @@ class DataPreProcessor:
         return ohe_cols, ord_cols, numeric_cols
 
     def fit_transform(self, df: pd.DataFrame):
-        # Сохраняем копию до удаления целевой переменной
         df_original = self._preprocess_base(df.copy())
 
         target_series = None
@@ -130,37 +135,38 @@ class DataPreProcessor:
             remainder="drop",
         )
 
-        self.pipeline = Pipeline([("preprocessor", preprocessor)])
-        transformed = self.pipeline.fit_transform(df_no_target)
+        # Весь пайплайн сразу
+        self.pipeline = Pipeline(
+            [("pre", preprocessor), ("minmax", MinMaxScaler(feature_range=(0, 1)))]
+        )
 
+        X_scaled = self.pipeline.fit_transform(df_no_target)
+
+        # имена колонок
         output_cols = (
             list(
-                self.pipeline.named_steps["preprocessor"]
-                .named_transformers_["ohe"]
-                .get_feature_names_out(ohe_cols)
+                preprocessor.named_transformers_["ohe"].get_feature_names_out(ohe_cols)
             )
             + ord_cols
             + numeric_cols
         )
 
-        df_transformed = pd.DataFrame(transformed, columns=output_cols, index=df.index)
+        df_transformed = pd.DataFrame(X_scaled, columns=output_cols, index=df.index)
+        df_transformed[output_cols] = np.clip(df_transformed[output_cols], 0.0, 1.0)
 
-        # CSV с таргетом + трансформированные признаки
         if target_series is not None:
-            df_corr = pd.concat([df_transformed, target_series], axis=1)
+            df_out = pd.concat([df_transformed, target_series], axis=1)
         else:
-            df_corr = df_transformed
+            df_out = df_transformed
 
-        df_corr.to_csv(os.path.join(self.processed_dir, "train_data.csv"), index=False)
+        df_out.to_csv(os.path.join(self.processed_dir, "train_data.csv"), index=False)
 
-        # Сохраняем только pipeline (без target)
         joblib.dump(
             self.pipeline,
             os.path.join(self.models_dir, f"{self.name}_preprocessor.pkl"),
         )
 
-        # Возвращаем для calc_target_correlations
-        return df_corr
+        return df_out
 
     def transform(self, df: pd.DataFrame):
         if self.pipeline is None:
@@ -169,22 +175,23 @@ class DataPreProcessor:
             )
 
         df = self._preprocess_base(df)
-
-        # Удаляем таргет, если он есть
         if TARGET_COL in df.columns:
             df = df.drop(columns=[TARGET_COL])
 
         ohe_cols, ord_cols, numeric_cols = self._get_feature_lists(df)
 
-        transformed = self.pipeline.transform(df)
+        X_scaled = self.pipeline.transform(df)
+
         output_cols = (
             list(
-                self.pipeline.named_steps["preprocessor"]
+                self.pipeline.named_steps["pre"]
                 .named_transformers_["ohe"]
                 .get_feature_names_out(ohe_cols)
             )
             + ord_cols
             + numeric_cols
         )
+        df_transformed = pd.DataFrame(X_scaled, columns=output_cols, index=df.index)
+        df_transformed[output_cols] = np.clip(df_transformed[output_cols], 0.0, 1.0)
 
-        return pd.DataFrame(transformed, columns=output_cols, index=df.index)
+        return df_transformed
