@@ -68,23 +68,28 @@ async def predict(file: UploadFile = File(...)):
                 status_code=400, content={"error": "CSV должен содержать колонку 'id'"}
             )
 
+        # прогоняем через препроцессор
         df_processed = preprocessor.transform(df)
-
         if selected_features:
-            missing_feats = [
-                f for f in selected_features if f not in df_processed.columns
-            ]
+            processed_cols = set(df_processed.columns) - {"id"}
+            expected_cols = set(selected_features)
+
+            missing_feats = sorted(expected_cols - processed_cols)
             if missing_feats:
                 return JSONResponse(
                     status_code=400,
                     content={
-                        "error": f"В обработанных данных отсутствуют признаки: {missing_feats}"
+                        "error": "Не хватает признаков после препроцессинга",
+                        "missing": missing_feats,
                     },
                 )
+
+            # удаляем все лишние столбцы
             X = df_processed[selected_features]
         else:
             X = df_processed.drop(columns=["id"], errors="ignore")
 
+        # предсказание
         proba = model.predict_proba(X)[:, 1]
         preds = (proba >= threshold).astype(int)
 
@@ -92,14 +97,16 @@ async def predict(file: UploadFile = File(...)):
             {"id": df["id"], "prediction": preds, "probability": proba}
         )
 
+        # формируем JSON
         result_json = {
-            str(row["id"]): int(row["prediction"]) for _, row in result_df.iterrows()
+            str(i): int(p) for i, p in zip(result_df["id"], result_df["prediction"])
         }
         prob_json = {
-            str(row["id"]): float(row["probability"]) for _, row in result_df.iterrows()
+            str(i): float(pr)
+            for i, pr in zip(result_df["id"], result_df["probability"])
         }
 
-        # Сохраняем CSV и JSON
+        # сохраняем
         orig_name = Path(file.filename).stem  # type: ignore
         csv_path = RESULTS_DIR / f"{orig_name}_pred_with_proba.csv"
         json_path = RESULTS_DIR / f"{orig_name}_pred_with_proba.json"
