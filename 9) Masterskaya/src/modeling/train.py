@@ -62,7 +62,7 @@ N_SPLITS = 5  # cv split
 METRIC = "f2"
 N_JOBS = -1
 THRESHOLDS = np.arange(0.1, 0.9, 0.01)
-MIN_PRECISION = 0.9  # гугл говорит, что меньше 0.9 табу для медицины
+MIN_PRECISION = 0.81  # гугл говорит, что меньше 0.9 табу для медицины
 MLFLOW_EXPERIMENT = "heat_pred"
 BETA = 2
 
@@ -267,6 +267,9 @@ def objective(trial, X_train, y_train):
 
         final_threshold = np.mean(fold_thresholds)
         trial.set_user_attr("best_threshold", final_threshold)
+        logger.info(
+            f"Fold thresholds: {fold_thresholds}, final_threshold: {final_threshold}"
+        )
 
         if np.isnan(score) or np.isinf(score):
             return -1
@@ -561,7 +564,7 @@ def log_with_mlflow(
             mlflow.log_artifact("shap_dot_plot.png")
             os.remove("shap_dot_plot.png")
 
-            # ------------------- Подготовка данных -------------------
+            # SHAP
             shap_mean = np.mean(shap_values.values, axis=0)
             shap_sign = np.sign(shap_mean)
 
@@ -581,7 +584,6 @@ def log_with_mlflow(
             # Цвета по направлению влияния
             colors = ["red" if x > 0 else "blue" for x in shap_df.shap_mean]
 
-            # ------------------- Построение графика -------------------
             plt.figure(figsize=(10, 8))
             plt.barh(shap_df["feature"], shap_df["shap_mean"], color=colors)
             plt.xlabel("SHAP значение")
@@ -640,7 +642,7 @@ def log_with_mlflow(
                 linestyle="--",
                 label=f"Threshold = {round(best_threshold, 3)}",
             )
-            plt.title("Distribution of predicted probabilities")
+            plt.title("Распределение предсказанных вероятностей")
             plt.xlabel("Probability")
             plt.ylabel("Count")
             plt.legend()
@@ -812,8 +814,8 @@ if __name__ == "__main__":
     y_main = TRAIN_DATA[TARGET_COL]
 
     # Сетка параметров для полбора лучших
-    fn_penalty_grid = np.arange(0, 1.5, 0.5)
-    fp_penalty_grid = np.arange(0, 1.5, 0.5)
+    fn_penalty_grid = np.arange(0, 2, 0.5)
+    fp_penalty_grid = np.arange(0, 2, 0.5)
     fn_stop_grid = range(0, 2)
     max_fn_soft_grid = range(0, 2)
 

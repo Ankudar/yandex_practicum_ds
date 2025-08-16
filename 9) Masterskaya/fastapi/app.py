@@ -8,24 +8,13 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-# ---------------------------------------------------------
-# Настройка путей
-# fastapi/app.py -> PROJECT_ROOT = 9) Masterskaya
-# src/ нужно добавить в sys.path
-# ---------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parent.parent  # ../.. от app.py
 SRC_DIR = PROJECT_ROOT / "src"
 sys.path.insert(0, str(SRC_DIR))  # добавляем src в PYTHONPATH
 
-# ---------------------------------------------------------
-# Импорты после добавления src
-# ---------------------------------------------------------
 from config import DROP_COLS, OHE_COLS, ORD_COLS  # type: ignore
 from modeling.datapreprocessor import DataPreProcessor  # type: ignore
 
-# ---------------------------------------------------------
-# FastAPI
-# ---------------------------------------------------------
 app = FastAPI()
 
 PREPROCESSOR_PATH = PROJECT_ROOT / "models" / "train_preprocessor.pkl"
@@ -50,6 +39,12 @@ preprocessor = DataPreProcessor(
     drop_cols=DROP_COLS, ohe_cols=OHE_COLS, ord_cols=ORD_COLS, name="train"
 )
 preprocessor.pipeline = preprocessor_pipeline
+
+
+@app.get("/health")
+def health():
+    return {"status": "OK"}
+
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/results", StaticFiles(directory=RESULTS_DIR), name="results")

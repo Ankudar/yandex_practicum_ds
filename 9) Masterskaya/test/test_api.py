@@ -15,7 +15,7 @@ def test_api_predict_file():
         response = requests.post(API_URL, files=files)
 
     print("Статус:", response.status_code)
-    print("Ответ:", response.text)  # выводим весь ответ целиком
+    print("Ответ:", response.text)
 
     assert response.status_code == 200, f"API вернул код {response.status_code}"
 

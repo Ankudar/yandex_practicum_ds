@@ -29,9 +29,8 @@ if not model_path.exists():
 
 MODEL = model_path
 
-# Препроцессор без изменений
-PREPROCESSOR = os.path.join(MODELS_DIR, "train_preprocessor.pkl")
 
+PREPROCESSOR = os.path.join(MODELS_DIR, "train_preprocessor.pkl")
 TEST_DATA_PATH = os.path.join(BASE_DIR, "..", "..", "data", "raw", "heart_test.csv")
 RESULTS_DIR = os.path.join(BASE_DIR, "..", "..", "data", "results")
 RESULT_FILE = os.path.join(RESULTS_DIR, "heart_test_pred.csv")
