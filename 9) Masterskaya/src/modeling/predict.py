@@ -55,7 +55,7 @@ def main():
 
         # Инициализируем препроцессор с параметрами из конфига
         preprocessor = DataPreProcessor(
-            drop_cols=config.DROP_COLS,
+            drop_cols=config.DROP_COLS,  # type: ignore
             ohe_cols=config.OHE_COLS,
             ord_cols=config.ORD_COLS,
         )

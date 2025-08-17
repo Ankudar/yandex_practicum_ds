@@ -37,14 +37,6 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent  # /src/modeling -> /src
 sys.path.append(str(PROJECT_ROOT))  # теперь добавляем /src
 from config import TARGET_COL
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# для наглядности лучше или хуже новая модель
-GREEN = "\033[92m"
-RED = "\033[91m"
-RESET = "\033[0m"
-
 # Путь к текущему файлу train.py
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TRAIN_DATA_PATH = os.path.join(
@@ -54,10 +46,18 @@ TRAIN_DATA = pd.read_csv(TRAIN_DATA_PATH, delimiter=",", decimal=",")
 
 MODELS_DIR = os.path.join(BASE_DIR, "..", "..", "models")
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# для наглядности лучше или хуже новая модель
+GREEN = "\033[92m"
+RED = "\033[91m"
+RESET = "\033[0m"
+
 
 TEST_SIZE = 0.25
 RANDOM_STATE = 40
-N_TRIALS = 200  # число итераций для оптуны
+N_TRIALS = 2  # число итераций для оптуны
 N_SPLITS = 5  # cv split
 METRIC = "f2"
 N_JOBS = -1

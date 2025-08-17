@@ -16,19 +16,24 @@ from sklearn.preprocessing import (
     RobustScaler,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.append(str(PROJECT_ROOT / "src"))
-
 
 class DataPreProcessor:
-    def __init__(self, name="default"):
+    def __init__(
+        self,
+        drop_cols=None,
+        ohe_cols=None,
+        ord_cols=None,
+        name="default",
+        processed_dir=None,
+        models_dir=None,
+    ):
         norm = self._normalize_name
-        self.drop_cols = [norm(c) for c in DROP_COLS]
-        self.ohe_cols = [norm(c) for c in OHE_COLS]
-        self.ord_cols = [norm(c) for c in ORD_COLS]
+        self.drop_cols = [norm(c) for c in (drop_cols or [])]
+        self.ohe_cols = [norm(c) for c in (ohe_cols or [])]
+        self.ord_cols = [norm(c) for c in (ord_cols or [])]
         self.name = name
-        self.processed_dir = PROCESSED_DIR
-        self.models_dir = MODELS_DIR
+        self.processed_dir = processed_dir or PROCESSED_DIR
+        self.models_dir = models_dir or MODELS_DIR
         self.pipeline = None
         os.makedirs(self.processed_dir, exist_ok=True)
         os.makedirs(self.models_dir, exist_ok=True)
