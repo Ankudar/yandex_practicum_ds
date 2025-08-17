@@ -6,6 +6,7 @@ from pathlib import Path
 import joblib
 import pandas as pd
 
+# --- Настройка путей ---
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent  # ../../.. от predict.py
 SRC_DIR = PROJECT_ROOT / "src"
 sys.path.insert(0, str(SRC_DIR))  # добавляем src в PYTHONPATH
@@ -13,91 +14,108 @@ sys.path.insert(0, str(SRC_DIR))  # добавляем src в PYTHONPATH
 import config
 from modeling.datapreprocessor import DataPreProcessor
 
+# --- Логирование ---
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-BASE_DIR = Path(__file__).resolve().parent  # папка src/modeling
-MODELS_DIR = PROJECT_ROOT / "models"  # ../../models относительно predict.py
 
-model_path = MODELS_DIR / "heart_pred.pkl"
+class Predictor:
+    def __init__(
+        self,
+        model_path: str,
+        preprocessor_path: str,
+        test_data_path: str,
+        result_file: str,
+    ):
+        self.model_path = Path(model_path)
+        self.preprocessor_path = Path(preprocessor_path)
+        self.test_data_path = Path(test_data_path)
+        self.result_file = Path(result_file)
 
-if not model_path.exists():
-    raise FileNotFoundError(f"Не найден файл модели: {model_path}")
+        self.model_bundle = None
+        self.model = None
+        self.threshold = None
+        self.selected_features = None
+        self.preprocessor = None
 
-MODEL = model_path
+        os.makedirs(self.result_file.parent, exist_ok=True)
 
+    def load_model(self):
+        if not self.model_path.exists():
+            raise FileNotFoundError(f"Не найден файл модели: {self.model_path}")
 
-PREPROCESSOR = os.path.join(MODELS_DIR, "train_preprocessor.pkl")
-TEST_DATA_PATH = os.path.join(BASE_DIR, "..", "..", "data", "raw", "heart_test.csv")
-RESULTS_DIR = os.path.join(BASE_DIR, "..", "..", "data", "results")
-RESULT_FILE = os.path.join(RESULTS_DIR, "heart_test_pred.csv")
+        self.model_bundle = joblib.load(self.model_path)
+        self.model = self.model_bundle["model"]
+        self.threshold = self.model_bundle["threshold"]
+        self.selected_features = self.model_bundle.get("selected_features", None)
+        logger.info(f"Модель загружена из {self.model_path}")
 
-os.makedirs(RESULTS_DIR, exist_ok=True)
-
-
-def main():
-    try:
-        # Загружаем модель и метаданные
-        model_bundle = joblib.load(MODEL)
-        model = model_bundle["model"]
-        threshold = model_bundle["threshold"]
-        selected_features = model_bundle.get("selected_features", None)
-
-        # Загружаем тестовые данные
-        df_test = pd.read_csv(TEST_DATA_PATH)
-
-        # Убираем таргет из данных на всякий случай
-        if config.TARGET_COL in df_test.columns:
-            df_test = df_test.drop(columns=[config.TARGET_COL])
-
-        # Инициализируем препроцессор с параметрами из конфига
-        preprocessor = DataPreProcessor(
+    def load_preprocessor(self):
+        self.preprocessor = DataPreProcessor(
             drop_cols=config.DROP_COLS,  # type: ignore
             ohe_cols=config.OHE_COLS,
             ord_cols=config.ORD_COLS,
         )
+        self.preprocessor.pipeline = joblib.load(self.preprocessor_path)
+        logger.info(f"Препроцессор загружен из {self.preprocessor_path}")
 
-        # Очистка имён колонок
-        df_test = preprocessor.clean_column_names(df_test)
+    def load_test_data(self) -> pd.DataFrame:
+        df = pd.read_csv(self.test_data_path)
+        if config.TARGET_COL in df.columns:
+            df = df.drop(columns=[config.TARGET_COL])
+        df = self.preprocessor.clean_column_names(df)  # type: ignore
+        return df
 
-        # Загружаем сохранённый pipeline
-        preprocessor.pipeline = joblib.load(PREPROCESSOR)
-
-        # Применяем transform
-        df_test_proc = preprocessor.transform(df_test)
-
-        # Фильтруем по отобранным признакам, если они есть
-        if selected_features:
+    def preprocess(self, df: pd.DataFrame) -> pd.DataFrame:
+        df_proc = self.preprocessor.transform(df)  # type: ignore
+        if self.selected_features:
             missing_feats = [
-                f for f in selected_features if f not in df_test_proc.columns
+                f for f in self.selected_features if f not in df_proc.columns
             ]
             if missing_feats:
                 logger.warning(
                     f"В обработанных данных отсутствуют признаки из selected_features: {missing_feats}"
                 )
-            df_test_proc = df_test_proc[
-                [f for f in selected_features if f in df_test_proc.columns]
+            df_proc = df_proc[
+                [f for f in self.selected_features if f in df_proc.columns]
             ]
+        return df_proc
 
-        # Предсказания
-        pred_proba = model.predict_proba(df_test_proc)[:, 1]
-        predictions = (pred_proba >= threshold).astype(int)
+    def predict(self, df_proc: pd.DataFrame) -> pd.DataFrame:
+        pred_proba = self.model.predict_proba(df_proc)[:, 1]  # type: ignore
+        predictions = (pred_proba >= self.threshold).astype(int)
+        return predictions
 
-        # Проверяем наличие id
-        if "id" not in df_test.columns:
-            raise ValueError("В тестовом файле отсутствует колонка 'id'")
+    def run(self):
+        try:
+            self.load_model()
+            self.load_preprocessor()
+            df_test = self.load_test_data()
+            df_test_proc = self.preprocess(df_test)
 
-        # Сохраняем результат
-        result_df = pd.DataFrame({"id": df_test["id"], "prediction": predictions})
-        result_df.to_csv(RESULT_FILE, index=False)
-        logger.info(f"Результаты предсказаний сохранены в {RESULT_FILE}")
+            if "id" not in df_test.columns:
+                raise ValueError("В тестовом файле отсутствует колонка 'id'")
 
-    except Exception as e:
-        logger.error(f"Ошибка в процессе предсказания: {e}")
-        raise
+            predictions = self.predict(df_test_proc)
+            result_df = pd.DataFrame({"id": df_test["id"], "prediction": predictions})
+            result_df.to_csv(self.result_file, index=False)
+            logger.info(f"Результаты предсказаний сохранены в {self.result_file}")
+
+        except Exception as e:
+            logger.error(f"Ошибка в процессе предсказания: {e}")
+            raise
 
 
 if __name__ == "__main__":
-    main()
+    BASE_DIR = Path(__file__).resolve().parent
+    MODELS_DIR = PROJECT_ROOT / "models"
+
+    predictor = Predictor(
+        model_path=MODELS_DIR / "heart_pred.pkl",  # type: ignore
+        preprocessor_path=MODELS_DIR / "train_preprocessor.pkl",  # type: ignore
+        test_data_path=PROJECT_ROOT / "data" / "raw" / "heart_test.csv",  # type: ignore
+        result_file=PROJECT_ROOT / "data" / "results" / "heart_test_pred.csv",  # type: ignore
+    )
+    predictor.run()
