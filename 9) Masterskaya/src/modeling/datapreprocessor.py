@@ -6,7 +6,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-from config import TARGET_COL
+from config import DROP_COLS, MODELS_DIR, OHE_COLS, ORD_COLS, PROCESSED_DIR, TARGET_COL
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (
@@ -16,27 +16,19 @@ from sklearn.preprocessing import (
     RobustScaler,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent  # fastapi/.. -> 9) Masterskaya
-sys.path.append(str(PROJECT_ROOT / "src"))  # Добавляем src в путь
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT / "src"))
 
 
 class DataPreProcessor:
-    def __init__(
-        self,
-        drop_cols=None,
-        ohe_cols=None,
-        ord_cols=None,
-        name="default",
-        processed_dir="../data/processed/",
-        models_dir="../models/",
-    ):
+    def __init__(self, name="default"):
         norm = self._normalize_name
-        self.drop_cols = [norm(c) for c in (drop_cols or [])]
-        self.ohe_cols = [norm(c) for c in (ohe_cols or [])]
-        self.ord_cols = [norm(c) for c in (ord_cols or [])]
+        self.drop_cols = [norm(c) for c in DROP_COLS]
+        self.ohe_cols = [norm(c) for c in OHE_COLS]
+        self.ord_cols = [norm(c) for c in ORD_COLS]
         self.name = name
-        self.processed_dir = processed_dir
-        self.models_dir = models_dir
+        self.processed_dir = PROCESSED_DIR
+        self.models_dir = MODELS_DIR
         self.pipeline = None
         os.makedirs(self.processed_dir, exist_ok=True)
         os.makedirs(self.models_dir, exist_ok=True)
