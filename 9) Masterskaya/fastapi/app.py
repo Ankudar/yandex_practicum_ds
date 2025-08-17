@@ -1,4 +1,3 @@
-import os
 import sys
 from io import BytesIO
 from pathlib import Path
