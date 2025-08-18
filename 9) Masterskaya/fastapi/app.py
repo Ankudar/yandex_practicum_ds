@@ -1,12 +1,16 @@
+import math
 import sys
+from enum import Enum
 from io import BytesIO
 from pathlib import Path
+from typing import Annotated, Optional
 
 import joblib
 import pandas as pd
-from fastapi import FastAPI, File, UploadFile
+from fastapi import Body, FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field, field_validator
 
 # --- Пути ---
 PROJECT_ROOT = Path(__file__).resolve().parent.parent  # ../.. от app.py
@@ -15,6 +19,233 @@ sys.path.insert(0, str(SRC_DIR))  # добавляем src в PYTHONPATH
 
 from config import DROP_COLS, OHE_COLS, ORD_COLS  # type: ignore
 from modeling.datapreprocessor import DataPreProcessor  # type: ignore
+
+
+class GenderEnum(str, Enum):
+    male = "Male"
+    female = "Female"
+    zero = "0.0"  # по хорошему нельзя так делать, надо писать ошибку, чтобы меняли данные на нормальные
+    one = "1.0"
+
+
+# рабочий код сделан под нашу текущую тестовую базу, в комментариях указано как надо делать по правильному (наверное :) )
+class PatientData(BaseModel):
+    id: Annotated[
+        int, Field(ge=0, description="id всегда целое, неотрицательное")
+    ]  # id всегда целое, неотрицательное
+
+    Age: Optional[
+        Annotated[
+            float,
+            Field(
+                ge=0,
+                le=1,
+                description="Возраст пациента (нормализованное значение 0-1)",
+            ),
+        ]
+    ] = None
+    # Должно быть так: Optional[conint(ge=0, le=120)]
+
+    Cholesterol: Optional[
+        Annotated[
+            float,
+            Field(ge=0, le=1, description="Холестерин (нормализованное значение)"),
+        ]
+    ] = None
+    # Должно быть так: Optional[confloat(ge=50, le=500)]
+
+    Heart_rate: Optional[
+        Annotated[
+            float,
+            Field(
+                ge=0,
+                le=1,
+                description="Частота сердечных сокращений (нормализованное значение)",
+            ),
+        ]
+    ] = None
+    # Должно быть так: Optional[conint(ge=30, le=250)]
+
+    Diabetes: Optional[
+        Annotated[float, Field(ge=0, le=1, description="Диабет (0/1)")]
+    ] = None
+    # Должно быть так: Optional[conint(ge=0, le=1)]
+
+    Family_History: Optional[
+        Annotated[float, Field(ge=0, le=1, description="Семейная история (0/1)")]
+    ] = None
+    # Должно быть так: Optional[conint(ge=0, le=1)]
+
+    Smoking: Optional[
+        Annotated[float, Field(ge=0, le=1, description="Курение (0/1)")]
+    ] = None
+    # Должно быть так: Optional[conint(ge=0, le=1)]
+
+    Obesity: Optional[
+        Annotated[float, Field(ge=0, le=1, description="Ожирение (0/1)")]
+    ] = None
+    # Должно быть так: Optional[conint(ge=0, le=1)]
+
+    Alcohol_Consumption: Optional[
+        Annotated[float, Field(ge=0, le=1, description="Употребление алкоголя (0/1)")]
+    ] = None
+    # Должно быть так: Optional[conint(ge=0, le=1)]
+
+    Exercise_Hours_Per_Week: Optional[
+        Annotated[
+            float,
+            Field(ge=0, le=1, description="Физ. нагрузка (нормализованное значение)"),
+        ]
+    ] = None
+    # Должно быть так: Optional[confloat(ge=0, le=50)]
+
+    Diet: Optional[
+        Annotated[
+            float, Field(ge=0, le=15, description="Диета (нормализованное значение)")
+        ]
+    ] = None
+    # Должно быть так: Optional[conint(ge=0, le=16)]
+
+    Previous_Heart_Problems: Optional[
+        Annotated[
+            float, Field(ge=0, le=1, description="Предыдущие проблемы с сердцем (0/1)")
+        ]
+    ] = None
+    # Должно быть так: Optional[conint(ge=0, le=1)]
+
+    Medication_Use: Optional[
+        Annotated[float, Field(ge=0, le=1, description="Приём лекарств (0/1)")]
+    ] = None
+    # Должно быть так: Optional[conint(ge=0, le=1)]
+
+    Stress_Level: Optional[
+        Annotated[
+            float,
+            Field(ge=0, le=1, description="Уровень стресса (нормализованное значение)"),
+        ]
+    ] = None
+    # Должно быть так: Optional[confloat(ge=0, le=10)]
+
+    Sedentary_Hours_Per_Day: Optional[
+        Annotated[
+            float,
+            Field(
+                ge=0, le=1, description="Сидячие часы в день (нормализованное значение)"
+            ),
+        ]
+    ] = None
+    # Должно быть так: Optional[confloat(ge=0, le=24)]
+
+    Income: Optional[
+        Annotated[
+            float, Field(ge=0, le=1, description="Доход (нормализованное значение)")
+        ]
+    ] = None
+    # Должно быть так: Optional[confloat(ge=0)]
+
+    BMI: Optional[
+        Annotated[
+            float,
+            Field(
+                ge=0, le=1, description="Индекс массы тела (нормализованное значение)"
+            ),
+        ]
+    ] = None
+    # Должно быть так: Optional[confloat(ge=10, le=70)]
+
+    Triglycerides: Optional[
+        Annotated[
+            float,
+            Field(ge=0, le=1, description="Триглицериды (нормализованное значение)"),
+        ]
+    ] = None
+    # Должно быть так: Optional[confloat(ge=30, le=1000)]
+
+    Physical_Activity_Days_Per_Week: Optional[
+        Annotated[
+            float,
+            Field(
+                ge=0,
+                le=1,
+                description="Физическая активность, дней/нед (нормализованное значение)",
+            ),
+        ]
+    ] = None
+    # Должно быть так: Optional[conint(ge=0, le=7)]
+
+    Sleep_Hours_Per_Day: Optional[
+        Annotated[
+            float,
+            Field(ge=0, le=1, description="Сон в часах (нормализованное значение)"),
+        ]
+    ] = None
+    # Должно быть так: Optional[confloat(ge=0, le=24)]
+
+    Blood_sugar: Optional[
+        Annotated[
+            float,
+            Field(ge=0, le=1, description="Уровень сахара (нормализованное значение)"),
+        ]
+    ] = None
+    # Должно быть так: Optional[confloat(ge=50, le=500)]
+
+    CK_MB: Optional[
+        Annotated[
+            float,
+            Field(
+                ge=0, le=1, description="Креатинкиназа-МВ (нормализованное значение)"
+            ),
+        ]
+    ] = None
+    # Должно быть так: Optional[confloat(ge=0, le=500)]
+
+    Troponin: Optional[
+        Annotated[
+            float, Field(ge=0, le=1, description="Тропонин (нормализованное значение)")
+        ]
+    ] = None
+    # Должно быть так: Optional[confloat(ge=0, le=100)]
+
+    Gender: Optional[GenderEnum] = Field(
+        None, description="Пол пациента (Male/Female/0.0/1.0)"
+    )
+    # Должно быть так: Enum [Male, Female]
+
+    Systolic_blood_pressure: Optional[
+        Annotated[
+            float,
+            Field(
+                ge=0,
+                le=1,
+                description="Систолическое давление (нормализованное значение)",
+            ),
+        ]
+    ] = None
+    # Должно быть так: Optional[confloat(ge=50, le=300)]
+
+    Diastolic_blood_pressure: Optional[
+        Annotated[
+            float,
+            Field(
+                ge=0,
+                le=1,
+                description="Диастолическое давление (нормализованное значение)",
+            ),
+        ]
+    ] = None
+    # Должно быть так: Optional[confloat(ge=30, le=200)]
+
+    @field_validator("Diabetes", "Smoking", "Obesity", mode="before")
+    def nan_to_none(cls, v):
+        """Преобразование NaN → None"""
+        if v is None:
+            return None
+        try:
+            if isinstance(v, float) and math.isnan(v):
+                return None
+        except:
+            pass
+        return v
 
 
 # --- Класс Predictor для FastAPI ---
@@ -99,6 +330,17 @@ async def predict(file: UploadFile = File(...)):
                 status_code=400, content={"error": "CSV должен содержать колонку 'id'"}
             )
 
+        # --- Проверка входных данных через Pydantic ---
+        try:
+            # пробуем валидировать каждую строку как PatientData
+            _ = [PatientData(**row.to_dict()) for _, row in df.iterrows()]
+        except Exception as e:
+            return JSONResponse(
+                status_code=400,
+                content={"error": f"Ошибка валидации входных данных: {str(e)}"},
+            )
+
+        # --- Предсказание ---
         result_df = predictor.predict(df)
 
         n_rows = len(result_df)

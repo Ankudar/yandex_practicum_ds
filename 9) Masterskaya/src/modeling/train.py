@@ -57,12 +57,12 @@ RESET = "\033[0m"
 
 TEST_SIZE = 0.25
 RANDOM_STATE = 40
-N_TRIALS = 2  # число итераций для оптуны
+N_TRIALS = 500  # число итераций для оптуны
 N_SPLITS = 5  # cv split
 METRIC = "f2"
 N_JOBS = -1
 THRESHOLDS = np.arange(0.1, 0.9, 0.01)
-MIN_PRECISION = 0.81  # гугл говорит, что меньше 0.9 табу для медицины
+MIN_PRECISION = 0.9  # гугл говорит, что меньше 0.9 табу для медицины
 MLFLOW_EXPERIMENT = "heat_pred"
 BETA = 2
 
@@ -814,8 +814,8 @@ if __name__ == "__main__":
     y_main = TRAIN_DATA[TARGET_COL]
 
     # Сетка параметров для полбора лучших
-    fn_penalty_grid = np.arange(0, 2, 0.5)
-    fp_penalty_grid = np.arange(0, 2, 0.5)
+    fn_penalty_grid = np.arange(0, 1, 0.5)
+    fp_penalty_grid = np.arange(0, 1, 0.5)
     fn_stop_grid = range(0, 2)
     max_fn_soft_grid = range(0, 2)
 
