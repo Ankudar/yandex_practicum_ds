@@ -132,14 +132,12 @@ class DataPreProcessor:
             remainder="drop",
         )
 
-        # Весь пайплайн сразу
         self.pipeline = Pipeline(
             [("pre", preprocessor), ("minmax", MinMaxScaler(feature_range=(0, 1)))]
         )
 
         X_scaled = self.pipeline.fit_transform(df_no_target)
 
-        # имена колонок
         output_cols = (
             list(
                 preprocessor.named_transformers_["ohe"].get_feature_names_out(ohe_cols)

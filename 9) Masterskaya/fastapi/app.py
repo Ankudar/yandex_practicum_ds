@@ -12,13 +12,18 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
-# --- Пути ---
-PROJECT_ROOT = Path(__file__).resolve().parent.parent  # ../.. от app.py
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
-sys.path.insert(0, str(SRC_DIR))  # добавляем src в PYTHONPATH
+sys.path.insert(0, str(SRC_DIR))
 
 from config import DROP_COLS, OHE_COLS, ORD_COLS  # type: ignore
 from modeling.datapreprocessor import DataPreProcessor  # type: ignore
+
+app = FastAPI()
+RESULTS_DIR = PROJECT_ROOT / "data" / "results"
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+MODELS_DIR = PROJECT_ROOT / "models"
 
 
 class GenderEnum(str, Enum):
@@ -248,7 +253,6 @@ class PatientData(BaseModel):
         return v
 
 
-# --- Класс Predictor для FastAPI ---
 class Predictor:
     def __init__(self, model_path, preprocessor_path):
         self.model_path = Path(model_path)
@@ -292,12 +296,6 @@ class Predictor:
         return pd.DataFrame({"id": df["id"], "prediction": preds, "probability": proba})
 
 
-# --- Инициализация FastAPI ---
-app = FastAPI()
-RESULTS_DIR = PROJECT_ROOT / "data" / "results"
-RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-
-MODELS_DIR = PROJECT_ROOT / "models"
 predictor = Predictor(
     model_path=MODELS_DIR / "heart_pred.pkl",
     preprocessor_path=MODELS_DIR / "train_preprocessor.pkl",
@@ -330,9 +328,7 @@ async def predict(file: UploadFile = File(...)):
                 status_code=400, content={"error": "CSV должен содержать колонку 'id'"}
             )
 
-        # --- Проверка входных данных через Pydantic ---
         try:
-            # пробуем валидировать каждую строку как PatientData
             _ = [PatientData(**row.to_dict()) for _, row in df.iterrows()]
         except Exception as e:
             return JSONResponse(
@@ -340,7 +336,6 @@ async def predict(file: UploadFile = File(...)):
                 content={"error": f"Ошибка валидации входных данных: {str(e)}"},
             )
 
-        # --- Предсказание ---
         result_df = predictor.predict(df)
 
         n_rows = len(result_df)
@@ -350,7 +345,6 @@ async def predict(file: UploadFile = File(...)):
             if extra_feats:
                 alerts.append(f"⚠️ В файле есть лишние признаки: {sorted(extra_feats)}")
 
-        # --- Сохраняем файлы ---
         orig_name = Path(file.filename).stem  # type: ignore
         csv_path = RESULTS_DIR / f"{orig_name}_pred_with_proba.csv"
         json_path = RESULTS_DIR / f"{orig_name}_pred_with_proba.json"

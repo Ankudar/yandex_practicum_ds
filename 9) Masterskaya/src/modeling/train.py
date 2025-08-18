@@ -304,7 +304,6 @@ def run_optuna_experiment(
 
         best_params = study.best_trial.params.copy()
 
-        # Извлекаем признаки
         selected_features = study.best_trial.user_attrs["selected_features"]
         n_selected_features = study.best_trial.user_attrs["n_selected_features"]
         best_params.pop("k_best", None)
@@ -312,10 +311,8 @@ def run_optuna_experiment(
         X_train = X_train[selected_features].astype(float)
         X_test = X_test[selected_features].astype(float)
 
-        # Извлекаем лучший порог
         best_threshold = study.best_trial.user_attrs["best_threshold"]
 
-        # Обучаем финальную модель XGBoost
         final_model = XGBClassifier(
             **best_params,
             random_state=RANDOM_STATE,
@@ -327,11 +324,9 @@ def run_optuna_experiment(
         logger.info(f"Гиперпараметры подобраны, начинается финальное обучение модели")
         final_model.fit(X_train, y_train)
 
-        # Предсказания
         y_pred_proba = final_model.predict_proba(X_test)[:, 1]
         y_pred = (y_pred_proba >= best_threshold).astype(int)
 
-        # Метрики на тесте
         recall = recall_score(y_test, y_pred)
         precision = precision_score(y_test, y_pred)
         cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
@@ -358,7 +353,6 @@ def run_optuna_experiment(
             f"bal_acc={final_metrics['bal_acc']:.4f}, "
         )
 
-        # Проверка — стоит ли сохранять модель
         save_model = True
         if os.path.exists(model_output_path):
             try:
@@ -392,7 +386,6 @@ def run_optuna_experiment(
                 )
                 save_model = True
 
-        # Сохранение модели
         if save_model:
             joblib.dump(
                 {
@@ -405,7 +398,6 @@ def run_optuna_experiment(
             )
             logger.info(f"Модель сохранена в {model_output_path}")
 
-        # Метрики на трейне
         input_example = pd.DataFrame(X_test[:1], columns=X_test.columns)
         input_example = input_example.astype(np.float64)
 
@@ -427,7 +419,6 @@ def run_optuna_experiment(
             "bal_acc": balanced_accuracy_score(y_train, y_pred_train),
         }
 
-        # Логирование в MLflow
         log_with_mlflow(
             final_model=final_model,
             metric=metric,
@@ -790,14 +781,12 @@ if __name__ == "__main__":
     MLRUNS_PATH = os.path.abspath(MLRUNS_PATH)
     mlflow.set_tracking_uri(f"file://{MLRUNS_PATH}")
 
-    # Приведение всех столбцов к числовому типу
     for col in TRAIN_DATA.columns:
         try:
             TRAIN_DATA[col] = pd.to_numeric(TRAIN_DATA[col])
         except ValueError:
             pass
 
-    # Найти integer столбцы с пропусками и привести их к float64
     int_cols_with_na = [
         col
         for col in TRAIN_DATA.select_dtypes(include=["int64", "Int64"]).columns
@@ -806,14 +795,12 @@ if __name__ == "__main__":
     for col in int_cols_with_na:
         TRAIN_DATA[col] = TRAIN_DATA[col].astype("float64")
 
-    # Для остальных числовых столбцов можно к float64
     num_cols = TRAIN_DATA.select_dtypes(include=["number"]).columns
     TRAIN_DATA[num_cols] = TRAIN_DATA[num_cols].astype("float64")
 
     X_main = TRAIN_DATA.drop(columns=[TARGET_COL])
     y_main = TRAIN_DATA[TARGET_COL]
 
-    # Сетка параметров для полбора лучших
     fn_penalty_grid = np.arange(0, 1, 0.5)
     fp_penalty_grid = np.arange(0, 1, 0.5)
     fn_stop_grid = range(0, 2)
