@@ -18,6 +18,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 class Predictor:
     def __init__(
         self,
@@ -113,6 +114,6 @@ if __name__ == "__main__":
         model_path=MODELS_DIR / "heart_pred.pkl",  # type: ignore
         preprocessor_path=MODELS_DIR / "train_preprocessor.pkl",  # type: ignore
         test_data_path=PROJECT_ROOT / "data" / "raw" / "heart_test.csv",  # type: ignore
-        result_file=PROJECT_ROOT / "data" / "results" / "heart_test_pred.csv",  # type: ignore
+        result_file=PROJECT_ROOT / "heart_test_pred.csv",  # type: ignore
     )
     predictor.run()
