@@ -296,10 +296,14 @@ class Predictor:
         return pd.DataFrame({"id": df["id"], "prediction": preds, "probability": proba})
 
 
-predictor = Predictor(
-    model_path=MODELS_DIR / "heart_pred.pkl",
-    preprocessor_path=MODELS_DIR / "train_preprocessor.pkl",
-)
+try:
+    predictor = Predictor(
+        model_path=MODELS_DIR / "heart_pred.pkl",
+        preprocessor_path=MODELS_DIR / "train_preprocessor.pkl",
+    )
+except FileNotFoundError as e:
+    predictor = None
+    print(f"\033[91m{e}\033[0m")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/results", StaticFiles(directory=RESULTS_DIR), name="results")
@@ -319,6 +323,11 @@ async def root():
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
+    if predictor is None:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "failed", "error": "❌ Файл модели не обнаружен"},
+        )
     try:
         contents = await file.read()
         df = pd.read_csv(BytesIO(contents))
