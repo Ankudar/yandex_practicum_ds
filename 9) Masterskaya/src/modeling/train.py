@@ -801,10 +801,10 @@ if __name__ == "__main__":
     X_main = TRAIN_DATA.drop(columns=[TARGET_COL])
     y_main = TRAIN_DATA[TARGET_COL]
 
-    fn_penalty_grid = np.arange(0, 1, 0.5)
-    fp_penalty_grid = np.arange(0, 1, 0.5)
-    fn_stop_grid = range(0, 2)
-    max_fn_soft_grid = range(0, 2)
+    fn_penalty_grid = np.arange(0.5, 0.6, 0.5)
+    fp_penalty_grid = np.arange(0.5, 0.6, 0.5)
+    fn_stop_grid = range(1, 2)
+    max_fn_soft_grid = range(1, 2)
 
     for fn_penalty, fp_penalty, fn_stop_val, max_fn_soft_val in product(
         fn_penalty_grid, fp_penalty_grid, fn_stop_grid, max_fn_soft_grid
