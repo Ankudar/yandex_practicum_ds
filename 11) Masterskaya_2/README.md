@@ -1,28 +1,5 @@
 <h1>Техническое задание — Маркетинг (apparel)</h1>
 
-<style>
-body {
-  font-family: Inter, Segoe UI, Arial, sans-serif;
-  line-height: 1.5;
-  color: #111;
-  max-width: 900px;
-}
-h1, h2, h3 {
-  color: #0b3;
-}
-pre {
-  background: #f6f6f6;
-  padding: 12px;
-  border-radius: 6px;
-  overflow: auto;
-}
-code {
-  background: #f0f0f0;
-  padding: 2px 4px;
-  border-radius: 4px;
-}
-</style>
-
 <h2>Краткая цель</h2>
 <p>Предсказать вероятность покупки клиента в течение 90 дней.</p>
 
