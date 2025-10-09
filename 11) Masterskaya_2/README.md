@@ -1,25 +1,35 @@
-<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8" />
-  <title>README — ТЗ Маркетинг (apparel)</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>body{font-family:Inter,Segoe UI,Arial,sans-serif;line-height:1.5;color:#111;padding:24px;max-width:900px}h1,h2{color:#0b3}pre{background:#f6f6f6;padding:12px;border-radius:6px;overflow:auto}</style>
-</head>
-<body>
-  <h1>Техническое задание — Маркетинг (apparel)</h1>
+<h1>Техническое задание — Маркетинг (apparel)</h1>
 
-  <h2>Краткая цель</h2>
-  <p>Предсказать вероятность покупки клиента в течение 90 дней.</p>
+<style>
+body {
+  font-family: Inter, Segoe UI, Arial, sans-serif;
+  line-height: 1.5;
+  color: #111;
+  padding: 24px;
+  max-width: 900px;
+}
+h1, h2 {
+  color: #0b3;
+}
+pre {
+  background: #f6f6f6;
+  padding: 12px;
+  border-radius: 6px;
+  overflow: auto;
+}
+</style>
 
-  <h2>Задачи</h2>
-  <ul>
-    <li>Изучение данных.</li>
-    <li>Разработка признаков.</li>
-    <li>Построение модели классификации.</li>
-    <li>Улучшение модели и максимизация roc_auc.</li>
-    <li>Тестирование и валидация.</li>
-  </ul>
+<h2>Краткая цель</h2>
+<p>Предсказать вероятность покупки клиента в течение 90 дней.</p>
+
+<h2>Задачи</h2>
+<ul>
+  <li>Изучение данных.</li>
+  <li>Разработка признаков.</li>
+  <li>Построение модели классификации.</li>
+  <li>Улучшение модели и максимизация roc_auc.</li>
+  <li>Тестирование и валидация.</li>
+</ul>
 
   <h2>Ожидаемый результат в репозитории</h2>
   <ul>
