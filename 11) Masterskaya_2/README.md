@@ -146,15 +146,6 @@ pip install -r requirements.txt
 jupyter lab  # открыть notebook/project.ipynb
 </code></pre>
 
-<h2>requirements.txt (пример)</h2>
-<pre><code>pandas>=2.2.0
-numpy>=1.26.0
-scikit-learn>=1.4.0
-jupyterlab>=4.0.0
-matplotlib>=3.8.0
-seaborn>=0.13.0
-</code></pre>
-
 <h2>Примечания</h2>
 <ul>
   <li>Модуль <code>func.py</code> содержит все функции пайплайна.</li>
