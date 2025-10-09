@@ -315,3 +315,29 @@ def suggest_param(trial, name, spec):
         return trial.suggest_categorical(name, spec)
     else:
         raise ValueError(f"Unsupported param spec: {spec}")
+
+
+def agg_period(df, cutoff_days, all_clients, last_date=None):
+    if cutoff_days is not None:
+        cutoff = last_date - pd.Timedelta(days=cutoff_days)
+        dff = df[df["date"] >= cutoff]
+    else:
+        dff = df
+
+    out = dff.groupby("client_id").agg(
+        purchases=("message_id", "nunique"),
+        items=("quantity", "sum"),
+        cost=("price", lambda x: (dff.loc[x.index, "quantity"] * x).sum()),
+    )
+
+    suffix = f"_{cutoff_days}d" if cutoff_days is not None else "_all"
+    out = out.rename(
+        columns={
+            "purchases": f"purchases{suffix}",
+            "items": f"items{suffix}",
+            "cost": f"cost{suffix}",
+        }
+    )
+
+    out = out.reindex(all_clients, fill_value=0).reset_index()
+    return out
