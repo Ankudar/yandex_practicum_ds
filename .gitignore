@@ -185,3 +185,4 @@ mlruns/0/meta.yaml
 11) Masterskaya_2/data/*
 11) Masterskaya_2/notebook/catboost_info/*
 12) Neyrosety/data/6_class.csv
+12) Neyrosety/notebook/best_model.pth
