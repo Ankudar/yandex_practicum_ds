@@ -282,7 +282,7 @@ def calc_target_correlations(df, target_col: str = None, drop_cols: list = None)
                 f"{value:.2f}",
                 ha="center",
                 va="center",
-                fontsize=5,
+                fontsize=10,
                 color="black",
             )
 
