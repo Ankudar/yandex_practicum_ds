@@ -8,7 +8,13 @@ import missingno as msno
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import torch
+import torch.nn as nn
+import torch.optim as optim
 from IPython.display import HTML, display
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+# === Библиотеки ML ===
 from sklearn.preprocessing import RobustScaler
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
@@ -322,27 +328,163 @@ def suggest_param(trial, name, spec):
         raise ValueError(f"Unsupported param spec: {spec}")
 
 
-def agg_period(df, cutoff_days, all_clients, last_date=None):
-    if cutoff_days is not None:
-        cutoff = last_date - pd.Timedelta(days=cutoff_days)
-        dff = df[df["date"] >= cutoff]
-    else:
-        dff = df
+def plot_results(
+    model, X_test, y_test, train_losses, test_losses, X_test_original=None
+):
+    model.eval()
+    with torch.no_grad():
+        predictions = model(X_test)
 
-    out = dff.groupby("client_id").agg(
-        purchases=("message_id", "nunique"),
-        items=("quantity", "sum"),
-        cost=("price", lambda x: (dff.loc[x.index, "quantity"] * x).sum()),
-    )
+    # Конвертируем в numpy для визуализации
+    y_test_np = y_test.numpy()
+    predictions_np = predictions.squeeze().numpy()
 
-    suffix = f"_{cutoff_days}d" if cutoff_days is not None else "_all"
-    out = out.rename(
-        columns={
-            "purchases": f"purchases{suffix}",
-            "items": f"items{suffix}",
-            "cost": f"cost{suffix}",
+    # Создаем DataFrame с предсказаниями
+    df_pred = pd.DataFrame(
+        {
+            "actual_temperature": y_test_np,
+            "predicted_temperature": predictions_np,
+            "absolute_error": np.abs(y_test_np - predictions_np),
         }
     )
 
-    out = out.reindex(all_clients, fill_value=0).reset_index()
-    return out
+    # Если передан оригинальный X_test (до препроцессинга), добавляем исходные признаки
+    if X_test_original is not None:
+        # Сбрасываем индекс для корректного объединения
+        X_test_original = X_test_original.reset_index(drop=True)
+        df_pred = pd.concat([X_test_original, df_pred], axis=1)
+
+    # Создаем subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+
+    # График 1: Факт vs Прогноз (столбиками)
+    num_stars = len(y_test_np)
+    bar_width = 0.4
+    x_pos = np.arange(num_stars)
+
+    # Внутренний столбик - Факт (синий)
+    bars_fact = ax1.bar(
+        x_pos - bar_width / 2,
+        y_test_np,
+        bar_width,
+        label="Факт",
+        color="red",
+        alpha=0.8,
+        edgecolor="black",
+    )
+
+    # Внешний столбик - Прогноз (желтый, прозрачный 50%)
+    bars_pred = ax1.bar(
+        x_pos + bar_width / 2,
+        predictions_np,
+        bar_width,
+        label="Прогноз",
+        color="green",
+        alpha=0.5,
+        edgecolor="black",
+    )
+
+    ax1.set_xlabel("Условные номера звёзд")
+    ax1.set_ylabel("Температура (K)")
+    ax1.set_title("Факт vs Прогноз температуры звезд")
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+
+    # График 2: Потери
+    ax2.plot(train_losses, label="Train Loss")
+    ax2.plot(test_losses, label="Test Loss")
+    ax2.set_xlabel("Эпоха")
+    ax2.set_ylabel("Loss (MSE)")
+    ax2.set_title("График потерь при обучении")
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
+    # Метрики
+    mae = mean_absolute_error(y_test_np, predictions_np)
+    r2 = r2_score(y_test_np, predictions_np)
+    rmse = np.sqrt(mean_squared_error(y_test_np, predictions_np))
+
+    logger.info(f"MAE: {mae:.2f} K")
+    logger.info(f"RMSE: {rmse:.2f} K")
+    logger.info(f"R² Score: {r2:.4f}")
+    logger.info(f"Средняя температура: {y_test_np.mean():.2f} K")
+    logger.info(f"Std температура: {y_test_np.std():.2f} K")
+
+    # Выводим первые строки DataFrame с предсказаниями
+    logger.info("\nПервые 10 предсказаний:")
+    display(df_pred.head(10))
+
+    # Статистика по ошибкам
+    logger.info("\nСтатистика по ошибкам предсказания:")
+    error_stats = df_pred["absolute_error"].describe()
+    display(error_stats)
+
+    return mae, rmse, r2, df_pred
+
+
+def plot_categorical_columns(data, col=None, target=None, top_n=None):
+    """
+    Визуализация категориальных столбцов: только столбчатые графики (с группировкой по target).
+    top_n — показывать только top_n категорий, остальные сворачивать в 'other'.
+    """
+    categorical_columns = data.select_dtypes(
+        include=["object", "category"]
+    ).columns.tolist()
+
+    if col is not None:
+        if col not in data.columns:
+            print(f"Столбец '{col}' не найден в DataFrame.")
+            return
+        categorical_columns = [col]
+
+    if len(categorical_columns) == 0:
+        print("Категориальных столбцов нет.")
+        return
+
+    n = len(categorical_columns)
+    ncols = 2
+    nrows = (n + ncols - 1) // ncols
+
+    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, figsize=(12, 5 * nrows))
+    if isinstance(axs, np.ndarray):
+        axs = axs.flatten()
+    else:
+        axs = [axs]
+
+    idx = 0
+    for c in categorical_columns:
+        # value_counts с NaN
+        vc = data[c].fillna("NaN").value_counts()
+
+        if top_n is not None and len(vc) > top_n:
+            head = vc.iloc[:top_n].copy()
+            rest = vc.iloc[top_n:].sum()
+            head["other"] = rest
+            vc = head
+
+        labels = vc.index.tolist()
+        cmap = plt.colormaps.get_cmap("tab20").resampled(max(1, len(labels)))
+        colors = [cmap(i) for i in range(len(labels))]
+
+        if target is not None and target in data.columns:
+            grouped = data.groupby([target, c]).size().unstack(fill_value=0)
+            cmap2 = plt.cm.get_cmap("tab20", max(1, len(grouped.columns)))
+            bar_colors = [cmap2(i) for i in range(len(grouped.columns))]
+            grouped.plot(kind="bar", ax=axs[idx], color=bar_colors)
+            axs[idx].legend(title=target)
+        else:
+            vc.plot(kind="bar", ax=axs[idx], color=colors)
+
+        axs[idx].set_title(f"{c} (гистограмма)")
+        axs[idx].set_ylabel("Частота")
+        axs[idx].tick_params(axis="x", rotation=90)
+        idx += 1
+
+    for j in range(idx, len(axs)):
+        axs[j].axis("off")
+
+    plt.tight_layout()
+    plt.show()
