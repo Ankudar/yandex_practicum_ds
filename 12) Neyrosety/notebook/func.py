@@ -328,6 +328,112 @@ def suggest_param(trial, name, spec):
         raise ValueError(f"Unsupported param spec: {spec}")
 
 
+# def plot_results(
+#     model, X_test, y_test, train_losses, test_losses, X_test_original=None
+# ):
+#     model.eval()
+#     with torch.no_grad():
+#         predictions = model(X_test)
+
+#     # Конвертируем в numpy для визуализации
+#     y_test_np = y_test.numpy()
+#     predictions_np = predictions.squeeze().numpy()
+
+#     # Создаем DataFrame с предсказаниями
+#     df_pred = pd.DataFrame(
+#         {
+#             "actual_temperature": y_test_np,
+#             "predicted_temperature": predictions_np,
+#             "absolute_error": np.abs(y_test_np - predictions_np),
+#         }
+#     )
+
+#     # Если передан оригинальный X_test (до препроцессинга), добавляем исходные признаки
+#     if X_test_original is not None:
+#         # Сбрасываем индекс для корректного объединения
+#         X_test_original = X_test_original.reset_index(drop=True)
+#         df_pred = pd.concat([X_test_original, df_pred], axis=1)
+
+#     # Создаем subplots
+#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+
+#     # График 1: Факт vs Прогноз (ПРАВИЛЬНОЕ НАЛОЖЕНИЕ)
+#     num_stars = len(y_test_np)
+#     x_pos = np.arange(num_stars)
+
+#     # Сначала рисуем ВНУТРЕННИЙ столбик - ПРОГНОЗ
+#     bars_pred = ax1.bar(
+#         x_pos,
+#         predictions_np,
+#         width=0.3,  # Узкий внутренний столбик
+#         color="yellow",
+#         alpha=0.9,  # Непрозрачный
+#         edgecolor="darkorange",
+#         linewidth=1.5,
+#         label="Прогноз",
+#         zorder=3,  # Выше по z-order
+#     )
+
+#     # Затем рисуем ВНЕШНИЙ столбик - ФАКТ (полупрозрачный)
+#     bars_actual = ax1.bar(
+#         x_pos,
+#         y_test_np,
+#         width=0.9,  # Широкий внешний столбик
+#         color="lightblue",
+#         alpha=0.5,  # Полупрозрачный
+#         edgecolor="lightblue",
+#         linewidth=1,
+#         label="Факт",
+#         zorder=2,  # Ниже по z-order
+#     )
+
+#     ax1.set_xlabel("Номер звезды в таблице данных")
+#     ax1.set_ylabel("Температура звезды (K)")
+#     ax1.set_title("Сравнение фактических и предсказанных температур звезд")
+#     ax1.legend()
+#     ax1.grid(True, alpha=0.3)
+#     ax1.set_xticks(x_pos)
+
+#     xticks_step = max(1, num_stars // 10)
+#     xticks_positions = np.arange(0, num_stars, xticks_step)
+#     ax1.set_xticks(xticks_positions)
+#     ax1.set_xticklabels(xticks_positions, rotation=90)
+
+#     # График 2: Потери
+#     ax2.plot(train_losses, label="Ошибка на обучении", color="blue", linewidth=2)
+#     ax2.plot(test_losses, label="Ошибка на тесте", color="orange", linewidth=2)
+#     ax2.set_xlabel("Эпоха обучения")
+#     ax2.set_ylabel("Ошибка (MSE)")
+#     ax2.set_title("График ошибок при обучении модели")
+#     ax2.legend()
+#     ax2.grid(True, alpha=0.3)
+
+#     plt.tight_layout()
+#     plt.show()
+
+#     # Метрики
+#     mae = mean_absolute_error(y_test_np, predictions_np)
+#     r2 = r2_score(y_test_np, predictions_np)
+#     rmse = np.sqrt(mean_squared_error(y_test_np, predictions_np))
+
+#     logger.info(f"Средняя абсолютная ошибка (MAE): {mae:.2f} K")
+#     logger.info(f"Среднеквадратичная ошибка (RMSE): {rmse:.2f} K")
+#     logger.info(f"Коэффициент детерминации (R²): {r2:.4f}")
+#     logger.info(f"Средняя температура: {y_test_np.mean():.2f} K")
+#     logger.info(f"Стандартное отклонение: {y_test_np.std():.2f} K")
+
+#     # Выводим первые строки DataFrame с предсказаниями
+#     logger.info("\nПервые 10 предсказаний:")
+#     display(df_pred.head(10))
+
+#     # Статистика по ошибкам
+#     logger.info("\nСтатистика по ошибкам предсказания:")
+#     error_stats = df_pred["absolute_error"].describe()
+#     display(error_stats)
+
+#     return mae, rmse, r2, df_pred
+
+
 def plot_results(
     model, X_test, y_test, train_losses, test_losses, X_test_original=None
 ):
@@ -335,9 +441,9 @@ def plot_results(
     with torch.no_grad():
         predictions = model(X_test)
 
-    # Конвертируем в numpy для визуализации
-    y_test_np = y_test.numpy()
-    predictions_np = predictions.squeeze().numpy()
+    # Конвертируем в numpy для визуализации - ПРЕЖДЕ ПЕРЕМЕЩАЕМ НА CPU
+    y_test_np = y_test.cpu().numpy()  # ДОБАВЛЕНО .cpu()
+    predictions_np = predictions.squeeze().cpu().numpy()  # ДОБАВЛЕНО .cpu()
 
     # Создаем DataFrame с предсказаниями
     df_pred = pd.DataFrame(
@@ -357,45 +463,54 @@ def plot_results(
     # Создаем subplots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
 
-    # График 1: Факт vs Прогноз (столбиками)
+    # График 1: Факт vs Прогноз (ПРАВИЛЬНОЕ НАЛОЖЕНИЕ)
     num_stars = len(y_test_np)
-    bar_width = 0.4
     x_pos = np.arange(num_stars)
 
-    # Внутренний столбик - Факт (синий)
-    bars_fact = ax1.bar(
-        x_pos - bar_width / 2,
-        y_test_np,
-        bar_width,
-        label="Факт",
-        color="red",
-        alpha=0.8,
-        edgecolor="black",
-    )
-
-    # Внешний столбик - Прогноз (желтый, прозрачный 50%)
+    # Сначала рисуем ВНУТРЕННИЙ столбик - ПРОГНОЗ
     bars_pred = ax1.bar(
-        x_pos + bar_width / 2,
+        x_pos,
         predictions_np,
-        bar_width,
+        width=0.3,  # Узкий внутренний столбик
+        color="yellow",
+        alpha=0.9,  # Непрозрачный
+        edgecolor="darkorange",
+        linewidth=1.5,
         label="Прогноз",
-        color="green",
-        alpha=0.5,
-        edgecolor="black",
+        zorder=3,  # Выше по z-order
     )
 
-    ax1.set_xlabel("Условные номера звёзд")
-    ax1.set_ylabel("Температура (K)")
-    ax1.set_title("Факт vs Прогноз температуры звезд")
+    # Затем рисуем ВНЕШНИЙ столбик - ФАКТ (полупрозрачный)
+    bars_actual = ax1.bar(
+        x_pos,
+        y_test_np,
+        width=0.9,  # Широкий внешний столбик
+        color="lightblue",
+        alpha=0.5,  # Полупрозрачный
+        edgecolor="lightblue",
+        linewidth=1,
+        label="Факт",
+        zorder=2,  # Ниже по z-order
+    )
+
+    ax1.set_xlabel("Номер звезды в таблице данных")
+    ax1.set_ylabel("Температура звезды (K)")
+    ax1.set_title("Сравнение фактических и предсказанных температур звезд")
     ax1.legend()
     ax1.grid(True, alpha=0.3)
+    ax1.set_xticks(x_pos)
+
+    xticks_step = max(1, num_stars // 10)
+    xticks_positions = np.arange(0, num_stars, xticks_step)
+    ax1.set_xticks(xticks_positions)
+    ax1.set_xticklabels(xticks_positions, rotation=90)
 
     # График 2: Потери
-    ax2.plot(train_losses, label="Train Loss")
-    ax2.plot(test_losses, label="Test Loss")
-    ax2.set_xlabel("Эпоха")
-    ax2.set_ylabel("Loss (MSE)")
-    ax2.set_title("График потерь при обучении")
+    ax2.plot(train_losses, label="Ошибка на обучении", color="blue", linewidth=2)
+    ax2.plot(test_losses, label="Ошибка на тесте", color="orange", linewidth=2)
+    ax2.set_xlabel("Эпоха обучения")
+    ax2.set_ylabel("Ошибка (MSE)")
+    ax2.set_title("График ошибок при обучении модели")
     ax2.legend()
     ax2.grid(True, alpha=0.3)
 
@@ -407,11 +522,11 @@ def plot_results(
     r2 = r2_score(y_test_np, predictions_np)
     rmse = np.sqrt(mean_squared_error(y_test_np, predictions_np))
 
-    logger.info(f"MAE: {mae:.2f} K")
-    logger.info(f"RMSE: {rmse:.2f} K")
-    logger.info(f"R² Score: {r2:.4f}")
+    logger.info(f"Средняя абсолютная ошибка (MAE): {mae:.2f} K")
+    logger.info(f"Среднеквадратичная ошибка (RMSE): {rmse:.2f} K")
+    logger.info(f"Коэффициент детерминации (R²): {r2:.4f}")
     logger.info(f"Средняя температура: {y_test_np.mean():.2f} K")
-    logger.info(f"Std температура: {y_test_np.std():.2f} K")
+    logger.info(f"Стандартное отклонение: {y_test_np.std():.2f} K")
 
     # Выводим первые строки DataFrame с предсказаниями
     logger.info("\nПервые 10 предсказаний:")
