@@ -138,13 +138,6 @@ def check_data(data):
 
     return data  # возвращаем измененные данные
 
-
-def parse_category_ids(x):
-    if isinstance(x, str):
-        return ast.literal_eval(x)
-    return x
-
-
 def plot_combined(data, col=None, target=None, col_type=None, legend_loc="best"):
     """
     Строит графики для числовых столбцов в DataFrame, автоматически определяя их типы (дискретные или непрерывные).
@@ -328,112 +321,6 @@ def suggest_param(trial, name, spec):
         raise ValueError(f"Unsupported param spec: {spec}")
 
 
-# def plot_results(
-#     model, X_test, y_test, train_losses, test_losses, X_test_original=None
-# ):
-#     model.eval()
-#     with torch.no_grad():
-#         predictions = model(X_test)
-
-#     # Конвертируем в numpy для визуализации
-#     y_test_np = y_test.numpy()
-#     predictions_np = predictions.squeeze().numpy()
-
-#     # Создаем DataFrame с предсказаниями
-#     df_pred = pd.DataFrame(
-#         {
-#             "actual_temperature": y_test_np,
-#             "predicted_temperature": predictions_np,
-#             "absolute_error": np.abs(y_test_np - predictions_np),
-#         }
-#     )
-
-#     # Если передан оригинальный X_test (до препроцессинга), добавляем исходные признаки
-#     if X_test_original is not None:
-#         # Сбрасываем индекс для корректного объединения
-#         X_test_original = X_test_original.reset_index(drop=True)
-#         df_pred = pd.concat([X_test_original, df_pred], axis=1)
-
-#     # Создаем subplots
-#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
-
-#     # График 1: Факт vs Прогноз (ПРАВИЛЬНОЕ НАЛОЖЕНИЕ)
-#     num_stars = len(y_test_np)
-#     x_pos = np.arange(num_stars)
-
-#     # Сначала рисуем ВНУТРЕННИЙ столбик - ПРОГНОЗ
-#     bars_pred = ax1.bar(
-#         x_pos,
-#         predictions_np,
-#         width=0.3,  # Узкий внутренний столбик
-#         color="yellow",
-#         alpha=0.9,  # Непрозрачный
-#         edgecolor="darkorange",
-#         linewidth=1.5,
-#         label="Прогноз",
-#         zorder=3,  # Выше по z-order
-#     )
-
-#     # Затем рисуем ВНЕШНИЙ столбик - ФАКТ (полупрозрачный)
-#     bars_actual = ax1.bar(
-#         x_pos,
-#         y_test_np,
-#         width=0.9,  # Широкий внешний столбик
-#         color="lightblue",
-#         alpha=0.5,  # Полупрозрачный
-#         edgecolor="lightblue",
-#         linewidth=1,
-#         label="Факт",
-#         zorder=2,  # Ниже по z-order
-#     )
-
-#     ax1.set_xlabel("Номер звезды в таблице данных")
-#     ax1.set_ylabel("Температура звезды (K)")
-#     ax1.set_title("Сравнение фактических и предсказанных температур звезд")
-#     ax1.legend()
-#     ax1.grid(True, alpha=0.3)
-#     ax1.set_xticks(x_pos)
-
-#     xticks_step = max(1, num_stars // 10)
-#     xticks_positions = np.arange(0, num_stars, xticks_step)
-#     ax1.set_xticks(xticks_positions)
-#     ax1.set_xticklabels(xticks_positions, rotation=90)
-
-#     # График 2: Потери
-#     ax2.plot(train_losses, label="Ошибка на обучении", color="blue", linewidth=2)
-#     ax2.plot(test_losses, label="Ошибка на тесте", color="orange", linewidth=2)
-#     ax2.set_xlabel("Эпоха обучения")
-#     ax2.set_ylabel("Ошибка (MSE)")
-#     ax2.set_title("График ошибок при обучении модели")
-#     ax2.legend()
-#     ax2.grid(True, alpha=0.3)
-
-#     plt.tight_layout()
-#     plt.show()
-
-#     # Метрики
-#     mae = mean_absolute_error(y_test_np, predictions_np)
-#     r2 = r2_score(y_test_np, predictions_np)
-#     rmse = np.sqrt(mean_squared_error(y_test_np, predictions_np))
-
-#     logger.info(f"Средняя абсолютная ошибка (MAE): {mae:.2f} K")
-#     logger.info(f"Среднеквадратичная ошибка (RMSE): {rmse:.2f} K")
-#     logger.info(f"Коэффициент детерминации (R²): {r2:.4f}")
-#     logger.info(f"Средняя температура: {y_test_np.mean():.2f} K")
-#     logger.info(f"Стандартное отклонение: {y_test_np.std():.2f} K")
-
-#     # Выводим первые строки DataFrame с предсказаниями
-#     logger.info("\nПервые 10 предсказаний:")
-#     display(df_pred.head(10))
-
-#     # Статистика по ошибкам
-#     logger.info("\nСтатистика по ошибкам предсказания:")
-#     error_stats = df_pred["absolute_error"].describe()
-#     display(error_stats)
-
-#     return mae, rmse, r2, df_pred
-
-
 def plot_results(
     model, X_test, y_test, train_losses, test_losses, X_test_original=None
 ):
@@ -441,11 +328,9 @@ def plot_results(
     with torch.no_grad():
         predictions = model(X_test)
 
-    # Конвертируем в numpy для визуализации - ПРЕЖДЕ ПЕРЕМЕЩАЕМ НА CPU
-    y_test_np = y_test.cpu().numpy()  # ДОБАВЛЕНО .cpu()
-    predictions_np = predictions.squeeze().cpu().numpy()  # ДОБАВЛЕНО .cpu()
+    y_test_np = y_test.cpu().numpy()
+    predictions_np = predictions.squeeze().cpu().numpy()
 
-    # Создаем DataFrame с предсказаниями
     df_pred = pd.DataFrame(
         {
             "actual_temperature": y_test_np,
@@ -454,43 +339,38 @@ def plot_results(
         }
     )
 
-    # Если передан оригинальный X_test (до препроцессинга), добавляем исходные признаки
     if X_test_original is not None:
-        # Сбрасываем индекс для корректного объединения
         X_test_original = X_test_original.reset_index(drop=True)
         df_pred = pd.concat([X_test_original, df_pred], axis=1)
 
-    # Создаем subplots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
 
-    # График 1: Факт vs Прогноз (ПРАВИЛЬНОЕ НАЛОЖЕНИЕ)
+    # График 1: Факт vs Прогноз
     num_stars = len(y_test_np)
     x_pos = np.arange(num_stars)
 
-    # Сначала рисуем ВНУТРЕННИЙ столбик - ПРОГНОЗ
     bars_pred = ax1.bar(
         x_pos,
         predictions_np,
-        width=0.3,  # Узкий внутренний столбик
+        width=0.3,
         color="yellow",
-        alpha=0.9,  # Непрозрачный
+        alpha=0.9,
         edgecolor="darkorange",
         linewidth=1.5,
         label="Прогноз",
-        zorder=3,  # Выше по z-order
+        zorder=3,
     )
 
-    # Затем рисуем ВНЕШНИЙ столбик - ФАКТ (полупрозрачный)
     bars_actual = ax1.bar(
         x_pos,
         y_test_np,
-        width=0.9,  # Широкий внешний столбик
+        width=0.9,
         color="lightblue",
-        alpha=0.5,  # Полупрозрачный
+        alpha=0.5,
         edgecolor="lightblue",
         linewidth=1,
         label="Факт",
-        zorder=2,  # Ниже по z-order
+        zorder=2,
     )
 
     ax1.set_xlabel("Номер звезды в таблице данных")
@@ -505,19 +385,21 @@ def plot_results(
     ax1.set_xticks(xticks_positions)
     ax1.set_xticklabels(xticks_positions, rotation=90)
 
-    # График 2: Потери
-    ax2.plot(train_losses, label="Ошибка на обучении", color="blue", linewidth=2)
-    ax2.plot(test_losses, label="Ошибка на тесте", color="orange", linewidth=2)
+    train_rmse = [loss for loss in train_losses]
+    test_rmse = [loss for loss in test_losses]
+
+    # График 2: Потери (RMSE)
+    ax2.plot(train_losses, label="Ошибка на обучении (RMSE)", color="blue", linewidth=2)
+    ax2.plot(test_losses, label="Ошибка на тесте (RMSE)", color="orange", linewidth=2)
     ax2.set_xlabel("Эпоха обучения")
-    ax2.set_ylabel("Ошибка (MSE)")
-    ax2.set_title("График ошибок при обучении модели")
+    ax2.set_ylabel("Ошибка (RMSE)")
+    ax2.set_title("Динамика RMSE при обучении модели")
     ax2.legend()
     ax2.grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.show()
 
-    # Метрики
     mae = mean_absolute_error(y_test_np, predictions_np)
     r2 = r2_score(y_test_np, predictions_np)
     rmse = np.sqrt(mean_squared_error(y_test_np, predictions_np))
@@ -528,11 +410,9 @@ def plot_results(
     logger.info(f"Средняя температура: {y_test_np.mean():.2f} K")
     logger.info(f"Стандартное отклонение: {y_test_np.std():.2f} K")
 
-    # Выводим первые строки DataFrame с предсказаниями
     logger.info("\nПервые 10 предсказаний:")
     display(df_pred.head(10))
 
-    # Статистика по ошибкам
     logger.info("\nСтатистика по ошибкам предсказания:")
     error_stats = df_pred["absolute_error"].describe()
     display(error_stats)
@@ -603,3 +483,37 @@ def plot_categorical_columns(data, col=None, target=None, top_n=None):
 
     plt.tight_layout()
     plt.show()
+
+
+def plot_scatter_with_numerical(data, target_column):
+    """
+    Функция для построения диаграммы рассеяния с регрессионной линией.
+
+    :param data: DataFrame с данными.
+    :param target_column: Название столбца с целевым признаком.
+    """
+    numerical_columns = data.select_dtypes(
+        include=["float64", "int64"]
+    ).columns.tolist()
+
+    if target_column in numerical_columns:
+        numerical_columns.remove(target_column)
+
+    for column in numerical_columns:
+        plt.figure(figsize=(15, 6))
+
+        # Диаграмма рассеяния с регрессионной линией
+        plt.subplot(1, 1, 1)
+        sns.regplot(
+            data=data,
+            x=column,
+            y=target_column,
+            scatter_kws={"alpha": 0.5},
+            line_kws={"color": "red"},
+        )
+        plt.title(f"Зависимость {target_column} от {column}")
+        plt.xlabel(column)
+        plt.ylabel(target_column)
+
+        plt.tight_layout()
+        plt.show()
