@@ -33,43 +33,74 @@
 | `CASE_ID` | Уникальный ID | Идентификатор происшествия | - |
 | `COLLISION_DATE` | Дата | Дата происшествия | ГГГГ/ММ/ДД |
 | `COLLISION_TIME` | Время | Время происшествия | 24-часовой формат |
-| `INTERSECTION` | Категория | Перекрёсток | Y/N/-- |
-| `WEATHER_1` | Категория | Погодные условия | A-G, - |
-| `COLLISION_DAMAGE` | Категория | Серьёзность повреждений | 0-4 |
-| `PRIMARY_COLLISION_FACTOR` | Категория | Основная причина | A-E, - |
-| `ROAD_SURFACE` | Категория | Состояние дороги | A-D, - |
-| `LIGHTING` | Категория | Освещение | A-E, - |
-| `COUNTY_CITY_LOCATION` | Число | Географический район | - |
-| `DIRECTION` | Категория | Направление движения | N/E/S/W/- |
-| `LOCATION_TYPE` | Категория | Тип дороги | H/I/R/- |
+| `INTERSECTION` | Категория | Является ли перекрёстком | Y - Intersection<br>N - Not Intersection<br>-- - Not stated |
+| `WEATHER_1` | Категория | Погодные условия | A - Clear (Ясно)<br>B - Cloudy (Облачно)<br>C - Raining (Дождь)<br>D - Snowing (Снегопад)<br>E - Fog (Туман)<br>F - Other (Другое)<br>G - Wind (Ветер)<br>- - Not Stated |
+| `COLLISION_DAMAGE` | Категория | Серьёзность повреждений | 0 - SCRATCH (Царапина)<br>1 - FATAL ТС (Не подлежит восстановлению)<br>2 - SEVERE DAMAGE (Серьёзный ремонт)<br>3 - MIDDLE DAMAGE (Средний ремонт)<br>4 - SMALL DAMAGE (Незначительный ремонт) |
+| `PRIMARY_COLLISION_FACTOR` | Категория | Основная причина ДТП | A - Code Violation (Нарушение ПДД)<br>B - Other Improper Driving<br>C - Other Than Driver<br>D - Unknown<br>E - Fell Asleep (Заснул)<br>- - Not Stated |
+| `ROAD_SURFACE` | Категория | Состояние дороги | A - Dry (Сухая)<br>B - Wet (Мокрая)<br>C - Snowy or Icy (Снег/Лёд)<br>D - Slippery (Скользкая)<br>- - Not Stated |
+| `LIGHTING` | Категория | Освещение | A - Daylight (Дневной свет)<br>B - Dusk-Dawn (Сумерки)<br>C - Dark-Street Lights (Темно с фонарями)<br>D - Dark-No Street Lights (Темно без фонарей)<br>E - Dark-Street Lights Not Functioning<br>- - Not Stated |
+| `COUNTY_CITY_LOCATION` | Число | Номер географического района | - |
+| `COUNTY_LOCATION` | Категория | Название географического района | Список названий |
+| `DIRECTION` | Категория | Направление движения | N - North<br>E - East<br>S - South<br>W - West<br>- - Not Stated |
+| `DISTANCE` | Число | Расстояние от главной дороги (м) | - |
+| `LOCATION_TYPE` | Категория | Тип дороги | H - Highway (Шоссе)<br>I - Intersection (Перекрёсток)<br>R - Ramp (Рампа)<br>- - Not Stated |
 | `PARTY_COUNT` | Число | Количество участников | - |
-| `PCF_VIOLATION_CATEGORY` | Категория | Категория нарушения | 00-24, - |
-| `TYPE_OF_COLLISION` | Категория | Тип столкновения | A-H, - |
-| `ROAD_CONDITION_1` | Категория | Дорожные условия | A-H, - |
+| `PCF_VIOLATION_CATEGORY` | Категория | Категория нарушения | 00-24 (см. детали ниже)<br>- - Not Stated |
+| `TYPE_OF_COLLISION` | Категория | Тип столкновения | A - Head-On (Лоб в лоб)<br>B - Sideswipe (Сторона)<br>C - Rear End (Задняя часть)<br>D - Broadside (Боковой удар)<br>E - Hit Object (Удар объекта)<br>F - Overturned (Опрокинутый)<br>G - Vehicle/Pedestrian<br>H - Other<br>- - Not Stated |
+| `MOTOR_VEHICLE_INVOLVED_WITH` | Категория | Дополнительные участники | Other motor vehicle<br>Fixed object<br>Parked motor vehicle<br>Pedestrian<br>Bicycle<br>Non-collision<br>Other object<br>Motor vehicle on other roadway<br>Animal<br>Train |
+| `ROAD_CONDITION_1` | Категория | Дорожное состояние | A - Holes, Deep Ruts (Ямы, колея)<br>B - Loose Material on Roadway<br>C - Obstruction on Roadway<br>D - Construction or Repair Zone<br>E - Reduced Roadway Width<br>F - Flooded (Затоплено)<br>G - Other<br>H - No Unusual Condition<br>- - Not Stated |
+
+#### Детализация PCF_VIOLATION_CATEGORY:
+**00-24** - Категории нарушений:
+- **01** - Вождение в состоянии опьянения
+- **02** - Препятствие движению
+- **03** - Небезопасная скорость
+- **04** - Опасное сближение
+- **05** - Неправильная сторона дороги
+- **06** - Неправильное движение
+- **07** - Небезопасная смена полосы
+- **08** - Неправильный поворот
+- **09** - Автомобильное право проезда
+- **10** - Пешеходное право проезда
+- **11** - Нарушение пешеходами
+- **12** - Дорожные сигналы и знаки
+- **13** - Неправильная парковка
+- **14** - Освещение
+- **15** - Тормоза
+- **16** - Другое оборудование
+- **17** - Другие нарушения
+- **18** - Кроме водителя/пешехода
+- **19** - Превышение скорости
+- **20** - Нарушение пешехода
+- **21** - Опасный старт
+- **22** - Другое неправильное вождение
+- **23** - Пешеход в состоянии опьянения
+- **24** - Заснул
+- **00** - Unknown
 
 ### Таблица `parties` (Участники ДТП)
 
 | Поле | Тип | Описание | Значения |
 |------|-----|----------|----------|
-| `CASE_ID` | ID | Связь с происшествием | - |
-| `PARTY_NUMBER` | Число | Номер участника | 1-N |
-| `PARTY_TYPE` | Категория | Тип участника | 1-6, - |
-| `AT_FAULT` | Бинарный | **Целевая переменная** | 0/1 |
-| `INSURANCE_PREMIUM` | Число | Сумма страховки ($ тыс.) | - |
-| `PARTY_DRUG_PHYSICAL` | Категория | Физическое состояние | E-I, - |
-| `PARTY_SOBRIETY` | Категория | Трезвость | A-H, - |
-| `CELLPHONE_IN_USE` | Бинарный | Использование телефона | 0/1 |
+| `CASE_ID` | ID | Связь с происшествием | Уникальный номер ДТП |
+| `PARTY_NUMBER` | Число | Номер участника | 1-N (по количеству участников) |
+| `PARTY_TYPE` | Категория | Тип участника | 1 - Car (Авто)<br>2 - Road bumper (Отбойник)<br>3 - Building (Строения)<br>4 - Road signs (Дорожные знаки)<br>5 - Other (Другое)<br>6 - Operator (Оператор)<br>- - Not Stated |
+| `AT_FAULT` | Бинарный | **Целевая переменная** - Виновность участника | 0 - Не виновен<br>1 - Виновен |
+| `INSURANCE_PREMIUM` | Число | Сумма страховки | Тысячи долларов $ |
+| `PARTY_DRUG_PHYSICAL` | Категория | Физическое состояние участника | E - Under Drug Influence (Под воздействием лекарств)<br>F - Impairment - Physical (Ухудшение состояния)<br>G - Impairment Unknown (Не известно)<br>H - Not Applicable (Не оценивался)<br>I - Sleepy/Fatigued (Сонный/Усталый)<br>- - Not Stated |
+| `PARTY_SOBRIETY` | Категория | Трезвость участника | A - Had Not Been Drinking (Не пил)<br>B - Had Been Drinking, Under Influence (Был пьян, под влиянием)<br>C - Had Been Drinking, Not Under Influence (Был пьян, не под влиянием)<br>D - Had Been Drinking, Impairment Unknown (Был пьян, ухудшение неизвестно)<br>G - Impairment Unknown (Неизвестно ухудшение)<br>H - Not Applicable (Не оценивался)<br>- - Not Stated |
+| `CELLPHONE_IN_USE` | Бинарный | Использование телефона | 0 - Не использовался<br>1 - Использовался (в т.ч. громкая связь) |
 
 ### Таблица `vehicles` (Транспортные средства)
 
 | Поле | Тип | Описание | Значения |
 |------|-----|----------|----------|
-| `ID` | Уникальный ID | ID записи | - |
-| `CASE_ID` | ID | Связь с происшествием | - |
-| `PARTY_NUMBER` | Число | Связь с участником | 1-N |
-| `VEHICLE_TYPE` | Категория | Тип кузова | MINIVAN, COUPE, etc. |
-| `VEHICLE_TRANSMISSION` | Категория | Тип КПП | auto/manual/- |
-| `VEHICLE_AGE` | Число | **Возраст автомобиля (лет)** | - |
+| `ID` | Уникальный ID | Индекс записи в таблице | - |
+| `CASE_ID` | ID | Связь с происшествием | Уникальный номер ДТП |
+| `PARTY_NUMBER` | Число | Связь с участником | 1-N (соответствует PARTY_NUMBER в таблице parties) |
+| `VEHICLE_TYPE` | Категория | Тип кузова | MINIVAN (Минивэн)<br>COUPE (Купе)<br>SEDAN (Седан)<br>HATCHBACK (Хэтчбек)<br>OTHER (Другой) |
+| `VEHICLE_TRANSMISSION` | Категория | Тип коробки передач | auto - Автоматическая<br>manual - Ручная<br>- - Not Stated |
+| `VEHICLE_AGE` | Число | **Возраст автомобиля** | Количество лет |
 
 ## Ключевые вопросы для исследования
 
