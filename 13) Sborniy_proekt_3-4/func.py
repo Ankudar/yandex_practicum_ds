@@ -83,7 +83,11 @@ def check_data(data):
     data.columns = normalize_columns(data.columns)
 
     # удалим лишние пробелы в строках
-    data = data.map(process_spaces)
+    for col in data.columns:
+        if data[col].dtype == "object":
+            data[col] = data[col].apply(
+                lambda x: process_spaces(x) if isinstance(x, str) else x
+            )
 
     # и в названии столбцов
     data.columns = [replace_spaces(col) for col in data.columns]
@@ -91,7 +95,10 @@ def check_data(data):
     # строки в ячейках строчными буквами
     for col in data.columns:
         if data[col].dtype == "object":
-            data[col] = data[col].str.lower()
+            # Безопасное преобразование: только для строк, игнорируем None и не-строки
+            data[col] = data[col].apply(
+                lambda x: x.lower() if isinstance(x, str) else x
+            )
 
     # общая информация
     display(format_display("Общая информация базы данных"))
