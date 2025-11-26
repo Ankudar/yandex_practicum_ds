@@ -512,3 +512,22 @@ def plot_scatter_with_numerical(data, target_column):
 
         plt.tight_layout()
         plt.show()
+
+
+class EarlyStoppingCallback:
+    def __init__(self, patience=10, min_delta=0.001):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.best_score = -np.inf
+        self.no_improvement_count = 0
+
+    def __call__(self, study, trial):
+        if study.best_value > self.best_score + self.min_delta:
+            self.best_score = study.best_value
+            self.no_improvement_count = 0
+        else:
+            self.no_improvement_count += 1
+
+        if self.no_improvement_count >= self.patience:
+            study.stop()
+            logger.info(f"Ранняя остановка: нет улучшений {self.patience} trials")
