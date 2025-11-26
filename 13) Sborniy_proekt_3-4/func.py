@@ -440,21 +440,27 @@ def plot_categorical_columns(data, col=None, target=None, top_n=None):
 
     idx = 0
     for c in categorical_columns:
-        # value_counts с NaN
-        vc = data[c].fillna("NaN").value_counts()
+        # Создаем копию данных для обработки top_n
+        plot_data = data.copy()
 
-        if top_n is not None and len(vc) > top_n:
-            head = vc.iloc[:top_n].copy()
-            rest = vc.iloc[top_n:].sum()
-            head["other"] = rest
-            vc = head
+        if top_n is not None:
+            # Находим top_n категорий
+            top_categories = plot_data[c].value_counts().head(top_n).index
+            # Заменяем остальные на 'other'
+            plot_data[c] = plot_data[c].apply(
+                lambda x: x if x in top_categories else "other"
+            )
+
+        # value_counts с NaN
+        vc = plot_data[c].fillna("NaN").value_counts()
 
         labels = vc.index.tolist()
         cmap = plt.colormaps.get_cmap("tab20").resampled(max(1, len(labels)))
         colors = [cmap(i) for i in range(len(labels))]
 
-        if target is not None and target in data.columns:
-            grouped = data.groupby([target, c]).size().unstack(fill_value=0)
+        if target is not None and target in plot_data.columns:
+            # Используем обработанные данные для группировки
+            grouped = plot_data.groupby([target, c]).size().unstack(fill_value=0)
             cmap2 = plt.cm.get_cmap("tab20", max(1, len(grouped.columns)))
             bar_colors = [cmap2(i) for i in range(len(grouped.columns))]
             grouped.plot(kind="bar", ax=axs[idx], color=bar_colors)
