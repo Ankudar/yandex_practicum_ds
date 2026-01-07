@@ -189,3 +189,7 @@ mlruns/0/meta.yaml
 12) Neyrosety/notebook/best_model_predictions.csv
 12) Neyrosety/notebook/optuna_trials_results.csv
 13) Sborniy_proekt_3-4/creds.py
+15) Mashinnoe_obuchenie_text/project/data/X_test_emb.npy
+15) Mashinnoe_obuchenie_text/project/data/X_train_emb.npy
+15) Mashinnoe_obuchenie_text/project/data/y_test.npy
+15) Mashinnoe_obuchenie_text/project/data/y_train.npy
