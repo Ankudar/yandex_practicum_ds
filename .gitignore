@@ -279,3 +279,7 @@ mlruns/0/meta.yaml
 15) Mashinnoe_obuchenie_text/project/nltk_data/taggers/averaged_perceptron_tagger.zip
 15) Mashinnoe_obuchenie_text/project/nltk_data/taggers/averaged_perceptron_tagger/averaged_perceptron_tagger.pickle
 15) Mashinnoe_obuchenie_text/project/nltk_data/sentiment/vader_lexicon.zip
+16) Comp_zrenie/keras/data/test_features.npy
+16) Comp_zrenie/keras/data/test_target.npy
+16) Comp_zrenie/keras/data/train_features.npy
+16) Comp_zrenie/keras/data/train_target.npy
