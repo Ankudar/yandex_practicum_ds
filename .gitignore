@@ -283,3 +283,42 @@ mlruns/0/meta.yaml
 16) Comp_zrenie/keras/data/test_target.npy
 16) Comp_zrenie/keras/data/train_features.npy
 16) Comp_zrenie/keras/data/train_target.npy
+venv_3_11/pyvenv.cfg
+venv_3_11/Scripts/activate
+venv_3_11/Scripts/activate.bat
+venv_3_11/Scripts/Activate.ps1
+venv_3_11/Scripts/deactivate.bat
+venv_3_11/Scripts/pip.exe
+venv_3_11/Scripts/pip3.11.exe
+venv_3_11/Scripts/pip3.exe
+venv_3_11/Scripts/python.exe
+venv_3_11/Scripts/pythonw.exe
+.venv_3_11/pyvenv.cfg
+.venv_3_11/Scripts/activate
+.venv_3_11/Scripts/activate.bat
+.venv_3_11/Scripts/Activate.ps1
+.venv_3_11/Scripts/deactivate.bat
+.venv_3_11/Scripts/estimator_ckpt_converter.exe
+.venv_3_11/Scripts/f2py.exe
+.venv_3_11/Scripts/google-oauthlib-tool.exe
+.venv_3_11/Scripts/import_pb_to_tensorboard.exe
+.venv_3_11/Scripts/markdown_py.exe
+.venv_3_11/Scripts/normalizer.exe
+.venv_3_11/Scripts/pip.exe
+.venv_3_11/Scripts/pip3.11.exe
+.venv_3_11/Scripts/pip3.exe
+.venv_3_11/Scripts/pyrsa-decrypt.exe
+.venv_3_11/Scripts/pyrsa-encrypt.exe
+.venv_3_11/Scripts/pyrsa-keygen.exe
+.venv_3_11/Scripts/pyrsa-priv2pub.exe
+.venv_3_11/Scripts/pyrsa-sign.exe
+.venv_3_11/Scripts/pyrsa-verify.exe
+.venv_3_11/Scripts/python.exe
+.venv_3_11/Scripts/pythonw.exe
+.venv_3_11/Scripts/saved_model_cli.exe
+.venv_3_11/Scripts/tensorboard.exe
+.venv_3_11/Scripts/tf_upgrade_v2.exe
+.venv_3_11/Scripts/tflite_convert.exe
+.venv_3_11/Scripts/toco_from_protos.exe
+.venv_3_11/Scripts/toco.exe
+.venv_3_11/Scripts/wheel.exe
