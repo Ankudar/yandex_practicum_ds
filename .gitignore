@@ -203,3 +203,9 @@ venv_3_11/Scripts/*
 .venv_3_11/pyvenv.cfg
 .venv_3_11/Scripts/*
 17) Sborniy_proekt_5/data/*
+18) Vipusknoy/notebook/catboost_info/catboost_training.json
+18) Vipusknoy/notebook/catboost_info/learn_error.tsv
+18) Vipusknoy/notebook/catboost_info/test_error.tsv
+18) Vipusknoy/notebook/catboost_info/time_left.tsv
+18) Vipusknoy/notebook/catboost_info/learn/events.out.tfevents
+18) Vipusknoy/notebook/catboost_info/test/events.out.tfevents
